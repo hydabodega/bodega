@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Pedido #{{ pedido.id }}</h2>
+        <a href="{{ url_for('listar_pedidos') }}" class="btn btn-secondary">Volver</a>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Información del Cliente</h4>
+                </div>
+                <div class="card-body">
+                    <p><strong>Nombre:</strong> {{ pedido.cliente_nombre }}</p>
+                    <p><strong>Dirección:</strong> {{ pedido.cliente_direccion }}</p>
+                    <p><strong>Teléfono:</strong> {{ pedido.cliente_telefono }}</p>
+                    <p><strong>Email:</strong> {{ pedido.cliente_email }}</p>
+                    <p><strong>Notas:</strong> {{ pedido.notas or 'Ninguna' }}</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h4>Detalles del Pedido</h4>
+                </div>
+                <div class="card-body">
+                    <p><strong>Fecha:</strong> {{ pedido.fecha }}</p>
+                    <p><strong>Estado:</strong> 
+                        <span class="badge bg-{{ 'success' if pedido.estado == 'completado' else 'warning' }}">
+                            {{ pedido.estado }}
+                        </span>
+                    </p>
+                    <p><strong>Total:</strong> ${{ pedido.total }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Productos</h4>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Precio</th>
+                                <th>Cantidad</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td>{{ item.producto_nombre }}</td>
+                                <td>${{ item.precio }}</td>
+                                <td>{{ item.cantidad }}</td>
+                                <td>${{ item.precio * item.cantidad }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Botones de acción -->
+    {% if pedido.estado == 'pendiente' %}
+    <div class="d-flex justify-content-end mt-4 gap-2">
+        <form method="POST" action="{{ url_for('procesar_pedido', pedido_id=pedido.id) }}">
+            <input type="hidden" name="accion" value="aceptar">
+            <button type="submit" class="btn btn-success">Aceptar Pedido</button>
+        </form>
+        <form method="POST" action="{{ url_for('procesar_pedido', pedido_id=pedido.id) }}">
+            <input type="hidden" name="accion" value="modificar">
+            <button type="submit" class="btn btn-warning">Modificar Pedido</button>
+        </form>
+        <form method="POST" action="{{ url_for('procesar_pedido', pedido_id=pedido.id) }}">
+            <input type="hidden" name="accion" value="cancelar">
+            <button type="submit" class="btn btn-danger">Cancelar Pedido</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

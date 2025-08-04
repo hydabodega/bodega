@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Editar Pedido #{{ pedido.id }}</h2>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="POST" class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Producto</label>
+                    <select name="producto_id" class="form-select" required>
+                        <option value="">Seleccionar producto</option>
+                        {% for producto in productos %}
+                            <option value="{{ producto.id }}">{{ producto.nombre }} - ${{ producto.precio }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Cantidad</label>
+                    <input type="number" name="cantidad" class="form-control" value="1" min="1" required>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">Agregar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Precio</th>
+                    <th>Cantidad</th>
+                    <th>Total</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.producto_nombre }}</td>
+                    <td>${{ item.precio }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('actualizar_item_pedido', item_id=item.id) }}">
+                            <div class="input-group">
+                                <input type="number" name="cantidad" value="{{ item.cantidad }}" 
+                                       min="1" class="form-control">
+                                <button type="submit" class="btn btn-sm btn-primary">Actualizar</button>
+                            </div>
+                        </form>
+                    </td>
+                    <td>${{ item.precio * item.cantidad }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('eliminar_item_pedido', item_id=item.id) }}">
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                    <td><strong>${{ total }}</strong></td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    
+    <div class="d-flex justify-content-end mt-4 gap-2">
+        <a href="{{ url_for('listar_pedidos') }}" class="btn btn-secondary">Cancelar</a>
+        <a href="{{ url_for('procesar_pedido', pedido_id=pedido.id) }}" class="btn btn-success">Guardar Cambios</a>
+    </div>
+</div>
+{% endblock %}
