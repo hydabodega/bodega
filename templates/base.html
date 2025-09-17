@@ -240,47 +240,13 @@
 <footer class="mt-5 py-4 bg-card">
     <div class="container">
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <h5 class="text-primary">{% if empresa and empresa.nombre %}{{ empresa.nombre }}{% else %}Bodega App{% endif %}</h5>
                 <p class="mb-1 text-muted">{{ empresa.direccion if empresa else '' }}</p>
                 <p class="text-muted">{{ empresa.telefono if empresa else '' }}</p>
             </div>
-            
-            <!-- Added payment information section -->
-            <div class="col-md-4">
-                <h6 class="text-primary mb-3"><i class="bi bi-credit-card me-2"></i>Información de Pago</h6>
-                <div class="payment-info">
-                    <p class="mb-1"><strong>Banco de Venezuela</strong></p>
-                    <p class="mb-1 text-muted">C.I. 19.464.230</p>
-                    <p class="mb-0 text-muted">Teléfono: 04127606331</p>
-                </div>
-            </div>
-            
-            <!-- Added QR code image placeholders -->
-            <div class="col-md-4">
-                <h6 class="text-primary mb-3"><i class="bi bi-qr-code me-2"></i>Códigos QR</h6>
-                <div class="d-flex gap-3">
-                    <div class="qr-placeholder">
-                        <img src="/placeholder.svg?height=80&width=80" 
-                             alt="QR Code 1" 
-                             class="img-fluid rounded border"
-                             style="width: 80px; height: 80px; object-fit: cover;">
-                        <small class="d-block text-center text-muted mt-1">Pago Móvil</small>
-                    </div>
-                    <div class="qr-placeholder">
-                        <img src="/placeholder.svg?height=80&width=80" 
-                             alt="QR Code 2" 
-                             class="img-fluid rounded border"
-                             style="width: 80px; height: 80px; object-fit: cover;">
-                        <small class="d-block text-center text-muted mt-1">Transferencia</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="social-links">
+            <div class="col-md-6 text-end">
+                <div class="social-links mb-3">
                     {% if empresa and empresa.facebook %}
                     <a href="{{ empresa.facebook }}" target="_blank" class="btn btn-sm btn-outline-primary me-2">
                         <i class="bi bi-facebook"></i>
@@ -302,9 +268,6 @@
                     </a>
                     {% endif %}
                 </div>
-            </div>
-            <div class="col-md-6 text-end">
-                <small class="text-muted">© 2024 {% if empresa and empresa.nombre %}{{ empresa.nombre }}{% else %}Bodega App{% endif %}. Todos los derechos reservados.</small>
             </div>
         </div>
     </div>
