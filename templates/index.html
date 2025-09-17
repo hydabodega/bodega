@@ -2,72 +2,54 @@
 
 {% block content %}
 <div class="container">
-    <!-- Hero Section desde index_muestra -->
-    <div class="row mb-5">
-        <div class="col-12">
-            <div class="card border-0 bg-gradient text-white" style="background: var(--primary-gradient); min-height: 300px;">
-                <div class="card-body d-flex align-items-center">
-                    <div class="row w-100 align-items-center">
-                        <div class="col-lg-8 order-2 order-lg-1">
-                            <h1 class="display-4 fw-bold mb-3">Bienvenido a nuestra tienda</h1>
-                            <p class="lead mb-4">Los mejores productos al mejor precio</p>
-                        </div>
-                        <div class="col-lg-4 text-center order-1 order-lg-2 mb-4 mb-lg-0">
-                            {% if empresa and empresa.logo_url %}
-                                <img src="{{ empresa.logo_url }}" alt="{{ empresa.nombre }}" class="img-fluid me-2" style="max-width: 200px; height: auto; border-radius: 50%;">
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    {% if empresa and empresa.logo_url %}
+    <div class="text-center mb-4">
+        <img src="{{ empresa.logo_url }}" alt="{{ empresa.nombre }}" class="img-fluid" style="max-height: 100px;">
     </div>
-
-    <!-- Resto del contenido de tu index actual pero con clases de estilo mejoradas -->
+    {% endif %}
+    
     <div class="row">
+        <!-- Panel principal (tienda) -->
         <div class="col-lg-9">
-            <!-- Mantén tu filtro de categorías actual pero con mejor estilo -->
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center mb-4 gap-2">
-                <h2 class="page-title mb-3 mb-md-0">Nuestros Productos</h2>
-                <div class="d-flex flex-column flex-md-row gap-2 align-items-stretch align-items-md-center w-100 w-md-auto">
-                    <!-- Filtro de categorías -->
-                    <div class="dropdown">
-                        <button type="button" class="btn btn-outline-primary dropdown-toggle w-100" 
-                                data-bs-toggle="dropdown" aria-expanded="false"
-                                style="border: 2px solid var(--primary-color); font-weight: 500;">
-                            <i class="bi bi-funnel me-2"></i>Categorías
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item {% if categoria_actual == 'todos' %}active{% endif %}" 
-                                href="{{ url_for('index') }}">
-                                <i class="bi bi-grid-fill me-2"></i>Todos los productos
-                            </a></li>
-                            {% for categoria in categorias %}
-                            <li><a class="dropdown-item {% if categoria_actual == categoria %}active{% endif %}" 
-                                href="{{ url_for('productos_por_categoria', categoria=categoria) }}">
-                                <i class="bi bi-tag-fill me-2"></i>{{ categoria }}
-                            </a></li>
-                            {% endfor %}
-                        </ul>
-                    </div>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Nuestros Productos</h2>
+    <div>
+        <div class="btn-group">
+            <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                Categorías
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item {% if categoria_actual == 'todos' %}active{% endif %}" 
+                       href="{{ url_for('index') }}">Todos</a></li>
+                {% for categoria in categorias %}
+                <li><a class="dropdown-item {% if categoria_actual == categoria %}active{% endif %}" 
+                       href="{{ url_for('productos_por_categoria', categoria=categoria) }}">{{ categoria }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        <button class="btn btn-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#consultaDeudaModal">
+            <i class="bi bi-search"></i> Consultar Deuda
+        </button>
+    </div>
+</div>
 
-                    <!-- Botón de consulta de deuda -->
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#consultaDeudaModal">
-                        <i class="bi bi-search me-1"></i> Consultar Deuda
-                    </button>
-                </div>
-            </div>
-
-            <!-- Los productos con el diseño de tarjetas mejorado -->
-            <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+<!-- Muestra la categoría actual seleccionada -->
+{% if categoria_actual and categoria_actual != 'todos' %}
+<div class="alert alert-info mb-4">
+    <i class="bi bi-tag me-2"></i> Mostrando productos de la categoría: <strong>{{ categoria_actual }}</strong>
+    <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-info ms-3">Ver todos</a>
+</div>
+{% endif %}
+            
+            <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-4">
                 {% for producto in productos %}
                 <div class="col">
-                    <div class="card h-100 product-card">
-                        <div class="position-relative overflow-hidden">
+                    <div class="card h-100 border-0 shadow-sm product-card">
+                        <div class="position-relative">
                             <img src="{{ producto.imagen_url }}" class="card-img-top product-img" alt="{{ producto.nombre }}">
                             {% if producto.cantidad <= 0 %}
-                            <div class="position-absolute top-0 end-0 m-2">
-                                <span class="badge bg-danger">Agotado</span>
+                            <div class="position-absolute top-0 end-0 bg-danger text-white p-1 px-2 rounded-start">
+                                Agotado
                             </div>
                             {% endif %}
                         </div>
@@ -76,6 +58,11 @@
                             <p class="card-text text-primary fw-bold mb-1">${{ producto.precio|round(2) }}</p>
                             <p class="card-text text-muted small mb-2">
                                 <i class="bi bi-grid"></i> {{ producto.categoria }}
+                                {% if producto.cantidad > 0 %}
+                                <span class="ms-2">
+                                    <i class="bi bi-box"></i> {{ producto.cantidad }} disponibles
+                                </span>
+                                {% endif %}
                             </p>
                             
                             {% if producto.cantidad > 0 %}
@@ -83,27 +70,34 @@
                                 <div class="input-group">
                                     <input type="number" name="quantity" class="form-control form-control-sm" 
                                            value="1" min="1" max="{{ producto.cantidad }}">
-                                    <button class="btn btn-primary" type="submit">
-                                        <i class="bi bi-cart-plus me-1"></i>Agregar
+                                    <button class="btn btn-primary btn-sm" type="submit">
+                                        <i class="bi bi-cart-plus"></i>
                                     </button>
                                 </div>
                             </form>
                             {% else %}
-                            <button class="btn btn-outline-secondary w-100" disabled>
-                                <i class="bi bi-x-circle me-1"></i>No disponible
+                            <button class="btn btn-outline-secondary w-100 btn-sm" disabled>
+                                Producto no disponible
                             </button>
                             {% endif %}
                         </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="col-12">
+                    <div class="alert alert-info text-center">
+                        <i class="bi bi-info-circle me-2"></i>
+                        No hay productos disponibles en este momento.
                     </div>
                 </div>
                 {% endfor %}
             </div>
         </div>
         
-        <!-- Carrito lateral -->
+        <!-- Panel lateral (carrito) -->
         <div class="col-lg-3 mt-4 mt-lg-0">
-            <div class="sticky-lg-top" style="top: 100px;">
-                <div class="card">
+            <div class="sticky-top" style="top: 20px;">
+                <div class="card shadow-sm">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
                             <i class="bi bi-cart me-2"></i> Tu Carrito
