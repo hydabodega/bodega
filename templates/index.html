@@ -21,18 +21,12 @@
             <p class="hero-subtitle">
                 Descubre nuestros productos de calidad y encuentra todo lo que necesitas en un solo lugar.
             </p>
-            
-            {% if not current_user.is_authenticated %}
-            <a href="{{ url_for('login') }}" class="hero-cta">
-                <i class="bi bi-box-arrow-in-right me-2"></i>
-                Iniciar Sesión para Comprar
-            </a>
-            {% else %}
+
             <a href="#productos" class="hero-cta">
                 <i class="bi bi-arrow-down me-2"></i>
                 Ver Productos
             </a>
-            {% endif %}
+            
         </div>
     </div>
 </section>
