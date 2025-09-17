@@ -133,7 +133,9 @@
                                             <div class="col-md-4">
                                                 <label class="form-label">Monto (USD)</label>
                                                 <input type="number" step="0.01" min="0.01" max="{{ deuda.saldo_pendiente }}"
-                                                    class="form-control" name="monto" required>
+                                                   class="form-control" name="monto" 
+                                                   value="{{ deuda.saldo_pendiente if deuda.saldo_pendiente > 0 else 0.01 }}"
+                                                   required>
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Descripción</label>
