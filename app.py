@@ -1190,20 +1190,21 @@ def registrar_pago_parcial(deuda_id):
             return redirect(url_for('dashboard'))
         
         saldo_pendiente = obtener_saldo_pendiente(deuda_id)
-        saldo_pendiente = round(saldo_pendiente, 2)  
+        saldo_pendiente = round(saldo_pendiente, 2)
         
-        # Usar comparación con tolerancia decimal
-        if abs(monto - saldo_pendiente) < 0.001:  # Nuevo: tolerancia de 0.001
-            monto = saldo_pendiente  # Ajustar al valor exacto
-            
+        # Validaciones
         if monto <= 0:
             flash('El monto debe ser mayor a cero', 'danger')
             return redirect(url_for('gestion_deudas', cliente_id=cliente_id))
         
-        # Validar que el monto no exceda el saldo pendiente
-        if monto > saldo_pendiente:
+        # Validar que el monto no exceda el saldo pendiente (con tolerancia)
+        if monto > saldo_pendiente + 0.01:  # Pequeña tolerancia para decimales
             flash(f'El monto no puede exceder el saldo pendiente (${saldo_pendiente:.2f})', 'danger')
             return redirect(url_for('gestion_deudas', cliente_id=cliente_id))
+        
+        # Ajustar monto si es casi igual al saldo pendiente (para evitar problemas de decimales)
+        if abs(monto - saldo_pendiente) < 0.01:
+            monto = saldo_pendiente
         
         # Crear pago parcial
         pago_data = {
@@ -1214,15 +1215,17 @@ def registrar_pago_parcial(deuda_id):
         }
         db_firestore.collection('pagos_parciales').add(pago_data)
 
-       # Verificar si la deuda queda saldada (corregir comparación)
+        # Verificar si la deuda queda saldada (con tolerancia para decimales)
         nuevo_saldo = saldo_pendiente - monto
-        if nuevo_saldo <= 0.01:  # Tolerancia decimal
-            # ✅ Actualizar estado usando string 'pagada'
+        if nuevo_saldo <= 0.01:  # Tolerancia de 1 centavo
+            # Si el saldo es muy pequeño, consideramos la deuda pagada
             db_firestore.collection('deudas').document(deuda_id).update({
                 'estado': 'pagada'
             })
+            flash('¡Deuda completamente saldada!', 'success')
+        else:
+            flash('Pago parcial registrado exitosamente', 'success')
         
-        flash('Pago parcial registrado exitosamente', 'success')
         return redirect(url_for('gestion_deudas', cliente_id=cliente_id))
     except Exception as e:
         print(f"Error al registrar pago parcial: {e}")
@@ -1230,42 +1233,46 @@ def registrar_pago_parcial(deuda_id):
         return redirect(url_for('dashboard'))
 
 def obtener_saldo_pendiente(deuda_id):
-    """Calcula el saldo pendiente de una deuda"""
-    # Calcular total de la deuda
-    total = 0.0
-    productos_query = db_firestore.collection('productos_deuda').where(
-        filter=FieldFilter('deuda_id', '==', deuda_id)).stream()
-    
-    # 1. CALCULAR EL TOTAL DE LA DEUDA (CORREGIDO)
-    for prod_doc in productos_query:
-        prod_data = prod_doc.to_dict()
-        producto_id = prod_data.get('producto_id', '')
-        cantidad = prod_data.get('cantidad', 0)
+    """Calcula el saldo pendiente de una deuda con precisión decimal"""
+    try:
+        # Calcular total de la deuda
+        total = 0.0
+        productos_query = db_firestore.collection('productos_deuda').where(
+            filter=FieldFilter('deuda_id', '==', deuda_id)).stream()
         
-        if producto_id:
-            if isinstance(producto_id, DocumentReference):
-                producto_ref = producto_id
-            elif isinstance(producto_id, str):
-                producto_ref = db_firestore.collection('productos').document(producto_id)
-            else:
-                continue
+        for prod_doc in productos_query:
+            prod_data = prod_doc.to_dict()
+            producto_id = prod_data.get('producto_id', '')
+            cantidad = float(prod_data.get('cantidad', 0))
             
-            producto_doc = producto_ref.get()
-            if producto_doc.exists:
-                producto = producto_doc.to_dict()
-                precio = float(producto.get('precio', 0.0))
-                total += precio * cantidad
+            if producto_id:
+                if isinstance(producto_id, DocumentReference):
+                    producto_ref = producto_id
+                elif isinstance(producto_id, str):
+                    producto_ref = db_firestore.collection('productos').document(producto_id)
+                else:
+                    continue
+                
+                producto_doc = producto_ref.get()
+                if producto_doc.exists:
+                    producto = producto_doc.to_dict()
+                    precio = float(producto.get('precio', 0.0))
+                    total += precio * cantidad
+        
+        # Restar pagos parciales
+        pagos_query = db_firestore.collection('pagos_parciales').where(
+            filter=FieldFilter('deuda_id', '==', deuda_id)).stream()
+        
+        for pago_doc in pagos_query:
+            pago_data = pago_doc.to_dict()
+            monto = float(pago_data.get('monto_usd', 0.0))
+            total -= monto
+        
+        return round(total, 2)
     
-    # 2. RESTAR PAGOS PARCIALES (CORREGIDO)
-    pagos_query = db_firestore.collection('pagos_parciales').where(
-        filter=FieldFilter('deuda_id', '==', deuda_id)).stream()
-    
-    for pago_doc in pagos_query:
-        pago_data = pago_doc.to_dict()
-        monto = float(pago_data.get('monto_usd', 0.0))
-        total -= monto
-    
-    return round(total, 2)  # Retornar saldo redondeado
+    except Exception as e:
+        print(f"Error al calcular saldo pendiente: {e}")
+        return 0.0
 
 @app.route('/eliminar_deuda/<int:id>', methods=['POST'])
 @login_required
