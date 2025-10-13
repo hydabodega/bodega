@@ -1,13 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
- Hero section with elegant design 
 <section class="hero-section">
     <div class="container">
         <div class="hero-content">
             {% if empresa and empresa.logo_url %}
-            <div class="mb-4">
-                <img src="{{ empresa.logo_url }}" alt="{{ empresa.nombre }}" class="img-fluid" style="max-height: 140px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));">
+            <div class="hero-logo">
+                <img src="{{ empresa.logo_url }}" alt="{{ empresa.nombre }}" class="img-fluid">
             </div>
             {% endif %}
             
@@ -19,15 +18,17 @@
                 {% endif %}
             </h1>
             <p class="hero-subtitle">
-                Descubre productos excepcionales seleccionados especialmente para ti
+                Descubre productos excepcionales con calidad garantizada y los mejores precios del mercado
             </p>
+            <div class="hero-accent">
+                <i class="bi bi-star-fill me-2"></i>Productos Seleccionados
+            </div>
         </div>
     </div>
 </section>
 
 <div class="container">
     <div class="row">
-         Main panel (store) 
         <div class="col-lg-9">
             <div id="productos" class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="mb-0" style="color: var(--color-primary);">
@@ -53,7 +54,6 @@
                 </div>
             </div>
 
-             Current category display 
             {% if categoria_actual and categoria_actual != 'todos' %}
             <div class="alert alert-info mb-4">
                 <i class="bi bi-tag me-2"></i> Mostrando productos de la categoría: <strong>{{ categoria_actual }}</strong>
@@ -61,7 +61,6 @@
             </div>
             {% endif %}
             
-             Product grid with elegant cards 
             <div class="product-grid">
                 {% for producto in productos %}
                 <div class="product-card">
@@ -118,7 +117,6 @@
             </div>
         </div>
         
-         Sidebar (cart) 
         <div class="col-lg-3 mt-4 mt-lg-0">
             <div class="sticky-top" style="top: 100px;">
                 <div class="card shadow-sm">
@@ -137,7 +135,6 @@
     </div>
 </div>
 
- Debt Consultation Modal 
 <div class="modal fade" id="consultaDeudaModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -164,7 +161,6 @@
     </div>
 </div>
 
- Toast notifications 
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="addedToCartToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
         <div class="toast-header bg-success text-white">
@@ -189,7 +185,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Function to update cart
     function updateCart() {
         fetch("{{ url_for('cart_sidebar_partial') }}")
             .then(response => response.text())
@@ -200,7 +195,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
-    // Function to update counter
     function updateCartCount() {
         fetch("{{ url_for('cart_count') }}")
             .then(response => response.json())
@@ -214,7 +208,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
-    // Function to assign removal events
     function assignRemoveEvents() {
         document.querySelectorAll('.remove-item-form').forEach(form => {
             form.addEventListener('submit', function(e) {
@@ -234,7 +227,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Function to show notifications
     function showToast(message) {
         const toastElement = document.getElementById('actionToast');
         const toastBody = toastElement.querySelector('.toast-body');
@@ -244,7 +236,6 @@ document.addEventListener('DOMContentLoaded', function() {
         toast.show();
     }
     
-    // Assign events to add to cart forms
     document.querySelectorAll('form[action^="/add_to_cart"]').forEach(form => {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -262,10 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Initialize events
     assignRemoveEvents();
-    
-    // Update cart on page load
     updateCart();
 });
 </script>
