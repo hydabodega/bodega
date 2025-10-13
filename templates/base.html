@@ -225,36 +225,36 @@
     <div class="container">
         <div class="row">
             <div class="col-md-4">
-                <h5 class="text-primary">{% if empresa and empresa.nombre %}{{ empresa.nombre }}{% else %}Bodega App{% endif %}</h5>
-                <p class="mb-1 text-muted">{{ empresa.direccion if empresa else '' }}</p>
-                <p class="text-muted">{{ empresa.telefono if empresa else '' }}</p>
+                <h5>{% if empresa and empresa.nombre %}{{ empresa.nombre }}{% else %}Bodega App{% endif %}</h5>
+                <p class="mb-1">{{ empresa.direccion if empresa else '' }}</p>
+                <p>{{ empresa.telefono if empresa else '' }}</p>
             </div>
             
             <div class="col-md-4">
-                <h6 class="text-primary mb-3"><i class="bi bi-credit-card me-2"></i>Información de Pago</h6>
+                <h6 class="mb-3"><i class="bi bi-credit-card me-2"></i>Información de Pago</h6>
                 <div class="payment-info">
                     <p class="mb-1"><strong>Banco de Venezuela</strong></p>
-                    <p class="mb-1 text-muted">C.I. 19.464.230</p>
-                    <p class="mb-0 text-muted">Teléfono: 04127606331</p>
+                    <p class="mb-1">C.I. 19.464.230</p>
+                    <p class="mb-0">Teléfono: 04127606331</p>
                 </div>
             </div>
             
             <div class="col-md-4">
-                <h6 class="text-primary mb-3"><i class="bi bi-qr-code me-2"></i>Códigos QR</h6>
+                <h6 class="mb-3"><i class="bi bi-qr-code me-2"></i>Códigos QR</h6>
                 <div class="d-flex gap-3">
                     <div class="qr-placeholder">
                         <img src="/placeholder.svg?height=80&width=80" 
                              alt="QR Code 1" 
                              class="img-fluid rounded border"
                              style="width: 80px; height: 80px; object-fit: cover;">
-                        <small class="d-block text-center text-muted mt-1">Pago Móvil</small>
+                        <small class="d-block text-center mt-1">Pago Móvil</small>
                     </div>
                     <div class="qr-placeholder">
                         <img src="/placeholder.svg?height=80&width=80" 
                              alt="QR Code 2" 
                              class="img-fluid rounded border"
                              style="width: 80px; height: 80px; object-fit: cover;">
-                        <small class="d-block text-center text-muted mt-1">Transferencia</small>
+                        <small class="d-block text-center mt-1">Transferencia</small>
                     </div>
                 </div>
             </div>
@@ -286,7 +286,7 @@
                 </div>
             </div>
             <div class="col-md-6 text-end">
-                <small class="text-muted">© 2025 {% if empresa and empresa.nombre %}{{ empresa.nombre }}{% else %}Bodega App{% endif %}. Todos los derechos reservados.</small>
+                <small>© 2025 {% if empresa and empresa.nombre %}{{ empresa.nombre }}{% else %}Bodega App{% endif %}. Todos los derechos reservados.</small>
             </div>
         </div>
     </div>
