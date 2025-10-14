@@ -721,7 +721,7 @@ footer strong {
 }
 
 .qr-placeholder:hover img {
-  transform: scale(1.08);
+  transform: scale(2.5);
 }
 
 .product-card:nth-child(1) {
