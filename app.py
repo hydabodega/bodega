@@ -371,16 +371,16 @@ def dashboard():
 @login_required
 def registrar_cliente():
     form = ClienteForm()
-    if form.validate_on_submit():
+    if form.validate_on_submit():  # Esto ahora siempre será True si se envía el formulario
         try:
             # Obtener próximo ID secuencial
             next_id = get_next_sequence('clientes')
             cliente_data = {
-                'nombre': request.form.get('nombre'),
-                'cedula': request.form.get('cedula'),
-                'direccion': request.form.get('direccion'),
-                'telefono': request.form.get('telefono'),
-                'email': request.form.get('email')
+                'nombre': request.form.get('nombre', ''),  # Usar valor por defecto
+                'cedula': request.form.get('cedula', ''),
+                'direccion': request.form.get('direccion', ''),
+                'telefono': request.form.get('telefono', ''),
+                'email': request.form.get('email', '')
             }
             
             # Actualizar contador
