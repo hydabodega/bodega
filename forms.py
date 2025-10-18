@@ -27,10 +27,10 @@ class ProductoForm(FlaskForm):
 
 class ClienteForm(FlaskForm):
     nombre = StringField('Nombre Completo', validators=[DataRequired()])
-    cedula = StringField('Cedula', validators=[DataRequired(), Length(min=6, max=8)])
-    direccion = StringField('Dirección', validators=[DataRequired()])
-    telefono = StringField('Teléfono', validators=[DataRequired()])
-    email = StringField('Email', validators=[DataRequired(), Email()])
+    cedula = StringField('Cedula')
+    direccion = StringField('Dirección')
+    telefono = StringField('Teléfono')
+    email = StringField('Email')
     submit = SubmitField('Guardar Cliente')
 
 class DeudaForm(FlaskForm):
