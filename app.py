@@ -426,13 +426,13 @@ def editar_cliente(id):
     if not doc.exists:
         abort(404)
     
-    # Actualizar el cliente
+    # Actualizar el cliente con valores por defecto para campos vacíos
     doc_ref.update({
-        'nombre': request.form.get('nombre'),
-        'cedula': request.form.get('cedula'),
-        'direccion': request.form.get('direccion'),
-        'telefono': request.form.get('telefono'),
-        'email': request.form.get('email')
+        'nombre': request.form.get('nombre', ''),
+        'cedula': request.form.get('cedula', ''),
+        'direccion': request.form.get('direccion', ''),
+        'telefono': request.form.get('telefono', ''),
+        'email': request.form.get('email', '')
     })
     flash('Cliente actualizado exitosamente', 'success')
     return redirect(url_for('listar_clientes'))
