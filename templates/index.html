@@ -91,9 +91,6 @@
                                 <input type="number" name="quantity" class="form-control" 
                                        value="1" min="1" max="{{ producto.cantidad }}" 
                                        style="border-right: none;">
-                                <button class="btn btn-primary" type="submit" style="border-top-left-radius: 0; border-bottom-left-radius: 0;">
-                                    <i class="bi bi-cart-plus"></i> Agregar
-                                </button>
                             </div>
                         </form>
                         {% else %}
@@ -114,19 +111,7 @@
             </div>
         </div>
         
-        <div class="col-lg-3 mt-4 mt-lg-0">
-            <div class="sticky-top" style="top: 100px;">
-                <div class="card shadow-sm">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="bi bi-cart3 me-2"></i> Tu Carrito
-                            <span class="badge bg-accent ms-2" id="cartBadge">0</span>
-                        </h5>
-                    </div>
-                    <div class="card-body p-0" id="cartSidebar">
-                        {% include 'partials/cart_sidebar.html' %}
-                    </div>
-                </div>
+        
             </div>
         </div>
     </div>
