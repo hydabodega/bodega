@@ -87,11 +87,7 @@
                         
                         {% if producto.cantidad > 0 %}
                         <form method="POST" action="{{ url_for('add_to_cart', product_id=producto.id) }}">
-                            <div class="input-group">
-                                <input type="number" name="quantity" class="form-control" 
-                                       value="1" min="1" max="{{ producto.cantidad }}" 
-                                       style="border-right: none;">
-                            </div>
+                            
                         </form>
                         {% else %}
                         <button class="btn btn-outline-secondary w-100" disabled>
