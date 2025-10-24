@@ -311,9 +311,9 @@
 }
 
 .hero-logo img {
-  max-height: 200px;
+  max-height: 300px;
   filter: drop-shadow(0 8px 16px rgba(236, 72, 153, 0.3));
-  animation: pulse 3s ease-in-out infinite;
+  animation: pulse 5s ease-in-out infinite;
 }
 
 @keyframes pulse {
@@ -322,7 +322,7 @@
     transform: scale(1);
   }
   50% {
-    transform: scale(1.05);
+    transform: scale(1.4);
   }
 }
 
