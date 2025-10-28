@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container py-4">
-    <!-- Added modern header with better styling -->
+    <!-- Header moderno -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex align-items-center mb-3">
@@ -17,86 +17,159 @@
         </div>
     </div>
 
+    <!-- Indicador de pasos -->
+    <div class="step-indicator mb-4">
+        <div class="step active" data-step="1">
+            <div class="step-number">1</div>
+            <div class="step-label">Seleccionar Cliente</div>
+        </div>
+        <div class="step" data-step="2">
+            <div class="step-number">2</div>
+            <div class="step-label">Agregar Productos</div>
+        </div>
+        <div class="step" data-step="3">
+            <div class="step-number">3</div>
+            <div class="step-label">Confirmar</div>
+        </div>
+    </div>
+
     <div class="row">
-        <div class="col-lg-8">
-            <!-- Improved client selection form with card design -->
+        <!-- Paso 1: Seleccionar Cliente -->
+        <div class="col-lg-8" id="step1-content">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-person me-2"></i>Seleccionar Cliente</h5>
+                    <h5 class="mb-0"><i class="bi bi-person me-2"></i>Paso 1: Seleccionar Cliente</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('registrar_deuda') }}">
-                        {{ deuda_form.hidden_tag() }}
-                        <div class="mb-3">
-                            {{ deuda_form.cliente_id.label(class="form-label fw-semibold") }}
-                            {{ deuda_form.cliente_id(class="form-select form-select-lg") }}
-                        </div>
-                        <div class="d-grid">
-                            {{ deuda_form.guardar(class="btn btn-success btn-lg") }}
-                        </div>
-                    </form>
+                    <div class="search-box mb-3">
+                        <i class="bi bi-search"></i>
+                        <input type="text" id="searchClient" class="form-control" placeholder="Buscar cliente por nombre, cédula...">
+                    </div>
+                    
+                    <div class="table-responsive" style="max-height: 300px;">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Seleccionar</th>
+                                    <th>Nombre</th>
+                                    <th>Cédula/RIF</th>
+                                    <th>Teléfono</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientsList">
+                                {% for cliente in clientes %}
+                                <tr class="client-row" data-client-id="{{ cliente.id }}">
+                                    <td>
+                                        <div class="form-check">
+                                            <input class="form-check-input client-checkbox" type="radio" 
+                                                   name="clientRadio" data-client-id="{{ cliente.id }}">
+                                        </div>
+                                    </td>
+                                    <td>{{ cliente.nombre }}</td>
+                                    <td>{{ cliente.cedula or cliente.rif or 'N/A' }}</td>
+                                    <td>{{ cliente.telefono or 'N/A' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end mt-3">
+                        <button class="btn btn-primary" id="nextToStep2" disabled>
+                            Siguiente <i class="bi bi-arrow-right ms-2"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Improved product addition form with better layout -->
+        <!-- Paso 2: Agregar Productos -->
+        <div class="col-lg-8" id="step2-content" style="display: none;">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Agregar Productos</h5>
+                    <h5 class="mb-0"><i class="bi bi-cart me-2"></i>Paso 2: Agregar Productos</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('registrar_deuda') }}">
+                    <div class="alert alert-info d-flex align-items-center mb-3">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <span>Cliente seleccionado: <strong id="selectedClientName"></strong></span>
+                    </div>
+
+                    <!-- Búsqueda y filtros de productos -->
+                    <div class="search-box mb-3">
+                        <i class="bi bi-search"></i>
+                        <input type="text" id="searchProduct" class="form-control" placeholder="Buscar productos...">
+                    </div>
+
+                    <!-- Formulario para agregar productos -->
+                    <form method="POST" action="{{ url_for('registrar_deuda') }}" id="productoForm">
                         {{ producto_form.hidden_tag() }}
-                        <div class="row g-3">
+                        <div class="row g-3 mb-4">
                             <div class="col-md-6">
                                 {{ producto_form.producto_id.label(class="form-label fw-semibold") }}
                                 {{ producto_form.producto_id(class="form-select") }}
                             </div>
                             <div class="col-md-4">
                                 {{ producto_form.cantidad.label(class="form-label fw-semibold") }}
-                                {{ producto_form.cantidad(class="form-control") }}
+                                {{ producto_form.cantidad(class="form-control", id="cantidadInput", value="1") }}
                             </div>
                             <div class="col-md-2 d-flex align-items-end">
-                                {{ producto_form.agregar(class="btn btn-primary w-100") }}
+                                <button type="button" class="btn btn-primary w-100" id="agregarProductoBtn">
+                                    <i class="bi bi-plus-circle me-1"></i> Agregar
+                                </button>
                             </div>
                         </div>
                     </form>
+
+                    <div class="nav-buttons">
+                        <button class="btn btn-outline-secondary" id="backToStep1">
+                            <i class="bi bi-arrow-left me-2"></i> Anterior
+                        </button>
+                        <button class="btn btn-primary" id="nextToStep3" disabled>
+                            Siguiente <i class="bi bi-arrow-right ms-2"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
+        <!-- Resumen lateral -->
         <div class="col-lg-4">
-            <!-- Added summary card for better UX -->
             <div class="card shadow-sm sticky-top" style="top: 20px;">
-                <div class="card-header bg-accent text-white">
-                    <h5 class="mb-0"><i class="bi bi-receipt me-2"></i>Resumen de Deuda</h5>
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-receipt me-2"></i>Resumen</h5>
                 </div>
                 <div class="card-body">
-                    {% if productos_deuda %}
-                        <div class="mb-3">
-                            <small class="text-muted">Total de productos: {{ productos_deuda|length }}</small>
-                        </div>
-                        <div class="text-center">
-                            <div class="display-6 text-primary fw-bold">
-                                {% if total is defined and total is number %}
-                                    ${{ total|round(2) }}
-                                {% else %}
-                                    $0.00
-                                {% endif %}
+                    <div id="resumenCliente" class="mb-3" style="display: none;">
+                        <h6>Cliente:</h6>
+                        <p id="clienteResumen" class="fw-bold"></p>
+                        <hr>
+                    </div>
+                    
+                    <div id="resumenProductos">
+                        {% if productos_deuda %}
+                            <div class="mb-3">
+                                <small class="text-muted">Productos: {{ productos_deuda|length }}</small>
                             </div>
-                            <small class="text-muted">USD</small>
-                        </div>
-                    {% else %}
-                        <div class="text-center text-muted">
-                            <i class="bi bi-cart-x fs-1 mb-3"></i>
-                            <p>No hay productos agregados</p>
-                        </div>
-                    {% endif %}
+                            <div class="text-center">
+                                <div class="display-6 text-primary fw-bold">
+                                    ${{ total|round(2) if total else '0.00' }}
+                                </div>
+                                <small class="text-muted">USD</small>
+                            </div>
+                        {% else %}
+                            <div class="text-center text-muted">
+                                <i class="bi bi-cart-x fs-1 mb-3"></i>
+                                <p>No hay productos</p>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Improved products table with better styling -->
+    <!-- Tabla de productos agregados -->
     {% if productos_deuda %}
     <div class="row mt-4">
         <div class="col-12">
@@ -111,8 +184,8 @@
                                 <tr>
                                     <th>Producto</th>
                                     <th class="text-center">Cantidad</th>
-                                    <th class="text-end">Precio Unit. (USD)</th>
-                                    <th class="text-end">Subtotal (USD)</th>
+                                    <th class="text-end">Precio Unit.</th>
+                                    <th class="text-end">Subtotal</th>
                                     <th class="text-center">Acciones</th>
                                 </tr>
                             </thead>
@@ -130,20 +203,8 @@
                                     <td class="text-center">
                                         <span class="badge bg-info">{{ producto.cantidad }}</span>
                                     </td>
-                                    <td class="text-end">
-                                        {% if producto.precio is defined and producto.precio is number %}
-                                            ${{ producto.precio|round(2) }}
-                                        {% else %}
-                                            $0.00
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end fw-bold">
-                                        {% if producto.subtotal is defined and producto.subtotal is number %}
-                                            ${{ producto.subtotal|round(2) }}
-                                        {% else %}
-                                            $0.00
-                                        {% endif %}
-                                    </td>
+                                    <td class="text-end">${{ producto.precio|round(2) }}</td>
+                                    <td class="text-end fw-bold">${{ producto.subtotal|round(2) }}</td>
                                     <td class="text-center">
                                         <form method="POST" action="{{ url_for('eliminar_producto_temp', index=loop.index0) }}" class="d-inline">
                                             <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar este producto?')">
@@ -154,19 +215,6 @@
                                 </tr>
                                 {% endfor %}
                             </tbody>
-                            <tfoot class="table-light">
-                                <tr>
-                                    <td colspan="3" class="text-end fw-bold fs-5">Total:</td>
-                                    <td class="text-end fw-bold fs-5 text-primary">
-                                        {% if total is defined and total is number %}
-                                            ${{ total|round(2) }} USD
-                                        {% else %}
-                                            $0.00 USD
-                                        {% endif %}
-                                    </td>
-                                    <td></td>
-                                </tr>
-                            </tfoot>
                         </table>
                     </div>
                 </div>
@@ -175,4 +223,263 @@
     </div>
     {% endif %}
 </div>
+
+<!-- Modal para confirmar deuda -->
+<div class="modal fade" id="confirmarDeudaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Deuda</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas registrar esta deuda?</p>
+                <div class="alert alert-info">
+                    <strong>Cliente:</strong> <span id="confirmClienteNombre"></span><br>
+                    <strong>Total:</strong> $<span id="confirmTotal"></span> USD
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST" action="{{ url_for('registrar_deuda') }}" id="finalDeudaForm">
+                    {{ deuda_form.hidden_tag() }}
+                    <input type="hidden" name="cliente_id" id="finalClienteId">
+                    <button type="submit" class="btn btn-success" name="guardar">
+                        <i class="bi bi-check-circle me-2"></i> Confirmar Deuda
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let selectedClient = null;
+    let currentStep = 1;
+
+    // Navegación entre pasos
+    function showStep(step) {
+        // Ocultar todos los pasos
+        document.getElementById('step1-content').style.display = 'none';
+        document.getElementById('step2-content').style.display = 'none';
+        
+        // Mostrar paso actual
+        if (step === 1) {
+            document.getElementById('step1-content').style.display = 'block';
+        } else if (step === 2) {
+            document.getElementById('step2-content').style.display = 'block';
+        }
+        
+        // Actualizar indicador
+        document.querySelectorAll('.step').forEach((stepEl, index) => {
+            if (index + 1 <= step) {
+                stepEl.classList.add('active');
+            } else {
+                stepEl.classList.remove('active');
+            }
+        });
+        
+        currentStep = step;
+    }
+
+    // Búsqueda de clientes
+    $('#searchClient').on('input', function() {
+        const searchText = $(this).val().toLowerCase();
+        $('.client-row').each(function() {
+            const rowText = $(this).text().toLowerCase();
+            $(this).toggle(rowText.includes(searchText));
+        });
+    });
+
+    // Selección de cliente
+    $('.client-checkbox').click(function() {
+        $('.client-checkbox').prop('checked', false);
+        $(this).prop('checked', true);
+        
+        const row = $(this).closest('.client-row');
+        const clientId = row.data('client-id');
+        const clientName = row.find('td:nth-child(2)').text();
+        const clientCedula = row.find('td:nth-child(3)').text();
+        
+        selectedClient = {
+            id: clientId,
+            name: clientName,
+            cedula: clientCedula
+        };
+        
+        // Actualizar resumen
+        $('#clienteResumen').text(`${clientName} (${clientCedula})`);
+        $('#resumenCliente').show();
+        
+        // Habilitar siguiente paso
+        $('#nextToStep2').prop('disabled', false);
+    });
+
+    // Navegación
+    $('#nextToStep2').click(function() {
+        if (selectedClient) {
+            $('#selectedClientName').text(selectedClient.name);
+            showStep(2);
+        }
+    });
+
+    $('#backToStep1').click(function() {
+        showStep(1);
+    });
+
+    // Agregar producto con validación
+    $('#agregarProductoBtn').click(function() {
+        const productoId = $('#producto_id').val();
+        const cantidad = $('#cantidadInput').val();
+
+        if (!productoId) {
+            showToast('Selecciona un producto', 'error');
+            return;
+        }
+
+        if (!cantidad || cantidad < 1) {
+            showToast('Ingresa una cantidad válida', 'error');
+            return;
+        }
+
+        // Verificar stock antes de agregar
+        fetch(`/api/producto/${productoId}`)
+            .then(response => response.json())
+            .then(producto => {
+                if (cantidad > producto.cantidad) {
+                    showToast(`No hay suficiente stock. Disponible: ${producto.cantidad}`, 'error');
+                    return;
+                }
+
+                // Enviar formulario si hay stock
+                $('#productoForm').submit();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Enviar formulario incluso si hay error (fallback)
+                $('#productoForm').submit();
+            });
+    });
+
+    // Confirmar deuda
+    $('#nextToStep3').click(function() {
+        if (selectedClient) {
+            $('#confirmClienteNombre').text(selectedClient.name);
+            $('#confirmTotal').text('{{ total|round(2) if total else "0.00" }}');
+            $('#finalClienteId').val(selectedClient.id);
+            
+            const modal = new bootstrap.Modal(document.getElementById('confirmarDeudaModal'));
+            modal.show();
+        }
+    });
+
+    // Inicializar Select2 para mejor UX
+    $('#producto_id').select2({
+        placeholder: "Selecciona un producto",
+        allowClear: true
+    });
+
+    // Búsqueda de productos
+    $('#searchProduct').on('input', function() {
+        const searchText = $(this).val().toLowerCase();
+        // Esto sería mejor con una API, pero por ahora filtramos client-side
+    });
+
+    // Habilitar siguiente paso si hay productos
+    {% if productos_deuda and productos_deuda|length > 0 %}
+        $('#nextToStep3').prop('disabled', false);
+    {% endif %}
+});
+
+// Estilos para el indicador de pasos
+const style = document.createElement('style');
+style.textContent = `
+    .step-indicator {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 2rem;
+    }
+    
+    .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0 1.5rem;
+        position: relative;
+    }
+    
+    .step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #e9ecef;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .step.active .step-number {
+        background: #0d6efd;
+        color: white;
+        transform: scale(1.1);
+    }
+    
+    .step-label {
+        font-weight: 500;
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    
+    .step.active .step-label {
+        color: #0d6efd;
+        font-weight: 600;
+    }
+    
+    .step:not(:last-child):after {
+        content: '';
+        position: absolute;
+        top: 20px;
+        right: -50%;
+        width: 100%;
+        height: 2px;
+        background: #e9ecef;
+    }
+    
+    .step.active:not(:last-child):after {
+        background: #0d6efd;
+    }
+
+    .search-box {
+        position: relative;
+    }
+    
+    .search-box i {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+    
+    .search-box input {
+        padding-left: 2.5rem;
+    }
+
+    .nav-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #dee2e6;
+    }
+`;
+document.head.appendChild(style);
+</script>
 {% endblock %}
