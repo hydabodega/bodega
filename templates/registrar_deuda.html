@@ -71,35 +71,32 @@
                         <i class="bi bi-check-circle me-2"></i>
                         <strong>Cliente seleccionado: </strong>
                         <span id="currentSelectedClient"></span>
-                        <input type="hidden" id="selectedClientId" name="selected_client_id">
                     </div>
                 </div>
             </div>
 
-            <!-- Sección Productos (solo se muestra cuando hay cliente seleccionado) -->
-            <div id="productsSection" style="display: none;">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Agregar Productos</h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST" action="{{ url_for('registrar_deuda') }}">
-                            {{ producto_form.hidden_tag() }}
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    {{ producto_form.producto_id.label(class="form-label fw-semibold") }}
-                                    {{ producto_form.producto_id(class="form-select") }}
-                                </div>
-                                <div class="col-md-4">
-                                    {{ producto_form.cantidad.label(class="form-label fw-semibold") }}
-                                    {{ producto_form.cantidad(class="form-control", placeholder="1", value="1") }}
-                                </div>
-                                <div class="col-md-2 d-flex align-items-end">
-                                    {{ producto_form.agregar(class="btn btn-primary w-100") }}
-                                </div>
+            <!-- Sección Productos (inicialmente oculta) -->
+            <div id="productsSection" class="card shadow-sm mb-4" style="display: none;">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Agregar Productos</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('registrar_deuda') }}">
+                        {{ producto_form.hidden_tag() }}
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                {{ producto_form.producto_id.label(class="form-label fw-semibold") }}
+                                {{ producto_form.producto_id(class="form-select") }}
                             </div>
-                        </form>
-                    </div>
+                            <div class="col-md-4">
+                                {{ producto_form.cantidad.label(class="form-label fw-semibold") }}
+                                {{ producto_form.cantidad(class="form-control", placeholder="1", value="1") }}
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                {{ producto_form.agregar(class="btn btn-primary w-100") }}
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -213,29 +210,23 @@
     </div>
     {% endif %}
 </div>
+
+<!-- Formulario oculto para enviar la selección del cliente -->
+<form method="POST" action="{{ url_for('registrar_deuda') }}" id="clientSelectForm" style="display: none;">
+    {{ deuda_form.hidden_tag() }}
+    <input type="hidden" name="cliente_id" id="hiddenClienteId">
+    <input type="hidden" name="select_cliente" value="1">
+</form>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Búsqueda de clientes por nombre
+    console.log("DOM cargado - Inicializando funcionalidad...");
+    
+    // Elementos del DOM
     const searchInput = document.getElementById('searchClient');
     const clientRows = document.querySelectorAll('.client-row');
-    
-    searchInput.addEventListener('input', function() {
-        const searchText = this.value.toLowerCase().trim();
-        
-        clientRows.forEach(row => {
-            const clientName = row.getAttribute('data-client-name');
-            if (clientName.includes(searchText)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
-    });
-
-    // Selección de cliente
     const clientRadios = document.querySelectorAll('.client-radio');
     const selectedClientInfo = document.getElementById('selectedClientInfo');
     const currentSelectedClient = document.getElementById('currentSelectedClient');
@@ -243,84 +234,143 @@ document.addEventListener('DOMContentLoaded', function() {
     const resumenCliente = document.getElementById('resumenCliente');
     const clienteResumen = document.getElementById('clienteResumen');
     const formClienteId = document.getElementById('formClienteId');
+    const hiddenClienteId = document.getElementById('hiddenClienteId');
+    const clientSelectForm = document.getElementById('clientSelectForm');
 
-    clientRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
-            if (this.checked) {
-                const clientId = this.getAttribute('data-client-id');
-                const clientName = this.getAttribute('data-client-name');
-                
-                // Actualizar la información del cliente seleccionado
-                currentSelectedClient.textContent = clientName;
-                selectedClientInfo.style.display = 'block';
-                
-                // Actualizar el resumen
-                clienteResumen.textContent = clientName;
-                resumenCliente.style.display = 'block';
-                formClienteId.value = clientId;
-                
-                // Mostrar la sección de productos
-                productsSection.style.display = 'block';
-                
-                // Scroll suave a la sección de productos
-                productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                
-                showToast(`Cliente seleccionado: ${clientName}`, 'success');
-            }
+    // Verificar que los elementos existan
+    if (!searchInput) console.error("No se encontró searchClient");
+    if (!productsSection) console.error("No se encontró productsSection");
+    if (!formClienteId) console.error("No se encontró formClienteId");
+    if (!hiddenClienteId) console.error("No se encontró hiddenClienteId");
+    if (!clientSelectForm) console.error("No se encontró clientSelectForm");
+
+    // Búsqueda de clientes por nombre
+    if (searchInput && clientRows.length > 0) {
+        searchInput.addEventListener('input', function() {
+            const searchText = this.value.toLowerCase().trim();
+            console.log("Buscando:", searchText);
+            
+            clientRows.forEach(row => {
+                const clientName = row.getAttribute('data-client-name');
+                if (clientName.includes(searchText)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
         });
-    });
+    }
+
+    // Selección de cliente
+    if (clientRadios.length > 0) {
+        clientRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.checked) {
+                    const clientId = this.getAttribute('data-client-id');
+                    const clientName = this.getAttribute('data-client-name');
+                    
+                    console.log("Cliente seleccionado:", clientName, "ID:", clientId);
+                    
+                    // Actualizar la información del cliente seleccionado
+                    if (currentSelectedClient) {
+                        currentSelectedClient.textContent = clientName;
+                    }
+                    if (selectedClientInfo) {
+                        selectedClientInfo.style.display = 'block';
+                    }
+                    
+                    // Actualizar el resumen
+                    if (clienteResumen) {
+                        clienteResumen.textContent = clientName;
+                    }
+                    if (resumenCliente) {
+                        resumenCliente.style.display = 'block';
+                    }
+                    
+                    // Actualizar los campos hidden
+                    if (formClienteId) {
+                        formClienteId.value = clientId;
+                    }
+                    if (hiddenClienteId) {
+                        hiddenClienteId.value = clientId;
+                    }
+                    
+                    // Mostrar la sección de productos
+                    if (productsSection) {
+                        productsSection.style.display = 'block';
+                        console.log("Mostrando sección de productos");
+                    }
+                    
+                    // Enviar el formulario automáticamente para guardar la selección
+                    if (clientSelectForm) {
+                        console.log("Enviando formulario de selección de cliente...");
+                        clientSelectForm.submit();
+                    }
+                    
+                    showToast(`Cliente seleccionado: ${clientName}`, 'success');
+                }
+            });
+        });
+    }
 
     // También permitir selección al hacer clic en la fila completa
-    clientRows.forEach(row => {
-        row.addEventListener('click', function(e) {
-            if (e.target.type !== 'radio') {
-                const radio = this.querySelector('.client-radio');
-                radio.checked = true;
-                radio.dispatchEvent(new Event('change'));
-            }
+    if (clientRows.length > 0) {
+        clientRows.forEach(row => {
+            row.addEventListener('click', function(e) {
+                if (e.target.type !== 'radio') {
+                    const radio = this.querySelector('.client-radio');
+                    if (radio) {
+                        radio.checked = true;
+                        radio.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
         });
-    });
+    }
 
     // Función para mostrar notificaciones
     function showToast(message, type = 'info') {
-        // Usar el toast de Bootstrap si existe
+        // Usar el toast global de Bootstrap si existe
         const toastEl = document.getElementById('globalToast');
         if (toastEl) {
             const toastBody = toastEl.querySelector('.toast-body');
+            const toastHeader = toastEl.querySelector('.toast-header strong');
             const toast = new bootstrap.Toast(toastEl);
-            toastBody.textContent = message;
+            
+            if (toastBody) toastBody.textContent = message;
             
             // Cambiar color según el tipo
-            const toastHeader = toastEl.querySelector('.toast-header strong');
             if (type === 'success') {
-                toastHeader.innerHTML = '<i class="bi bi-check-circle-fill text-success me-2"></i>Éxito';
+                if (toastHeader) toastHeader.innerHTML = '<i class="bi bi-check-circle-fill text-success me-2"></i>Éxito';
             } else if (type === 'error') {
-                toastHeader.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Error';
+                if (toastHeader) toastHeader.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Error';
             } else {
-                toastHeader.innerHTML = '<i class="bi bi-info-circle-fill text-info me-2"></i>Información';
+                if (toastHeader) toastHeader.innerHTML = '<i class="bi bi-info-circle-fill text-info me-2"></i>Información';
             }
             
             toast.show();
         } else {
-            // Fallback: alert simple
-            alert(message);
+            // Fallback: console log
+            console.log(`${type.toUpperCase()}: ${message}`);
         }
     }
 
     // Inicializar: si ya hay productos en la deuda, mostrar sección de productos
     {% if productos_deuda and deuda_form.cliente_id.data %}
-        productsSection.style.display = 'block';
-        // Buscar el nombre del cliente seleccionado
+        console.log("Inicializando con productos existentes...");
+        if (productsSection) {
+            productsSection.style.display = 'block';
+        }
+        // Buscar y marcar el cliente seleccionado
         {% for cliente in clientes %}
             {% if cliente.id == deuda_form.cliente_id.data %}
-                currentSelectedClient.textContent = '{{ cliente.nombre }}';
-                clienteResumen.textContent = '{{ cliente.nombre }}';
-                selectedClientInfo.style.display = 'block';
-                resumenCliente.style.display = 'block';
-                // Marcar el radio button correspondiente
                 const radio = document.querySelector(`.client-radio[data-client-id="{{ cliente.id }}"]`);
                 if (radio) {
                     radio.checked = true;
+                    // Disparar el evento change para actualizar la UI
+                    setTimeout(() => {
+                        radio.dispatchEvent(new Event('change'));
+                    }, 100);
                 }
             {% endif %}
         {% endfor %}
@@ -338,18 +388,9 @@ document.addEventListener('DOMContentLoaded', function() {
     background-color: #f8f9fa;
 }
 
-.client-row:active {
-    background-color: #e9ecef;
-}
-
 .form-check-input:checked {
     background-color: #0d6efd;
     border-color: #0d6efd;
-}
-
-/* Estilo para la fila seleccionada */
-.client-row.selected {
-    background-color: #e3f2fd;
 }
 </style>
 {% endblock %}
