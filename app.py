@@ -640,78 +640,91 @@ def registrar_deuda():
         return redirect(url_for('registrar_deuda'))
     
     # Manejar guardar deuda
-    if deuda_form.guardar.data and deuda_form.validate():
+if deuda_form.guardar.data and deuda_form.validate():
+    try:
         print("=== INICIANDO REGISTRO DE DEUDA ===")
-        print(f"Cliente seleccionado: {session.get('cliente_seleccionado')}")
-        print(f"Productos en deuda: {session.get('productos_deuda')}")
-        try:
-            # Validar que hay un cliente seleccionado
-            if not session.get('cliente_seleccionado'):
-                flash('Debe seleccionar un cliente', 'danger')
-                return redirect(url_for('registrar_deuda'))
+        
+        # Validar que hay un cliente seleccionado
+        if not session.get('cliente_seleccionado'):
+            flash('Debe seleccionar un cliente', 'danger')
+            print("ERROR: No hay cliente seleccionado")
+            return redirect(url_for('registrar_deuda'))
 
-            # Validar que hay productos en la deuda
-            if not session.get('productos_deuda'):
-                flash('Debe agregar al menos un producto a la deuda', 'danger')
-                return redirect(url_for('registrar_deuda'))
+        # Validar que hay productos en la deuda
+        if not session.get('productos_deuda'):
+            flash('Debe agregar al menos un producto a la deuda', 'danger')
+            print("ERROR: No hay productos en la deuda")
+            return redirect(url_for('registrar_deuda'))
+        
+        # Obtener próximo ID secuencial
+        next_id = get_next_sequence('deudas')
+        print(f"ID de deuda generado: {next_id}")
+        
+        # Obtener cliente de la sesión
+        cliente_id = session['cliente_seleccionado']
+        cliente_ref = db_firestore.collection('clientes').document(cliente_id)
+        cliente_doc = cliente_ref.get()
+        
+        if not cliente_doc.exists:
+            flash('Cliente no encontrado', 'danger')
+            print(f"ERROR: Cliente {cliente_id} no encontrado")
+            return redirect(url_for('registrar_deuda'))
+        
+        cliente_data = cliente_doc.to_dict()
+        print(f"Cliente: {cliente_data.get('nombre')}")
+        
+        # Crear datos de deuda
+        deuda_data = {
+            'cliente_id': cliente_ref,
+            'cliente_nombre': cliente_data.get('nombre', ''),
+            'cliente_cedula': cliente_data.get('cedula', ''),
+            'fecha': datetime.utcnow(),
+            'estado': 'pendiente'
+        }
+        
+        # Guardar deuda en Firestore
+        deuda_ref = db_firestore.collection('deudas').document(str(next_id))
+        deuda_ref.set(deuda_data)
+        print(f"Deuda guardada en Firestore: {next_id}")
+        
+        # Guardar productos asociados
+        productos_guardados = 0
+        for item in session['productos_deuda']:
+            producto_ref = db_firestore.collection('productos').document(str(item['producto_id']))
             
-            # Obtener próximo ID secuencial
-            next_id = get_next_sequence('deudas')
-            
-            # Obtener cliente de la sesión
-            cliente_id = session['cliente_seleccionado']
-            cliente_ref = db_firestore.collection('clientes').document(cliente_id)
-            cliente_doc = cliente_ref.get()
-            if not cliente_doc.exists:
-                flash('Cliente no encontrado', 'danger')
-                return redirect(url_for('registrar_deuda'))
-            
-            cliente_data = cliente_doc.to_dict()
-            
-            # Crear datos de deuda
-            deuda_data = {
-                'cliente_id': cliente_ref,
-                'cliente_nombre': cliente_data.get('nombre', ''),
-                'cliente_cedula': cliente_data.get('cedula', ''),
-                'fecha': datetime.utcnow(),
-                'estado': 'pendiente'
+            producto_deuda_data = {
+                'deuda_id': str(next_id),
+                'producto_id': str(item['producto_id']),
+                'cantidad': item['cantidad']
             }
             
-            # Guardar deuda en Firestore
-            deuda_ref = db_firestore.collection('deudas').document(str(next_id))
-            deuda_ref.set(deuda_data)
+            db_firestore.collection('productos_deuda').add(producto_deuda_data)
+            productos_guardados += 1
             
-            # Guardar productos asociados
-            for item in session['productos_deuda']:
-                producto_ref = db_firestore.collection('productos').document(str(item['producto_id']))
-                
-                producto_deuda_data = {
-                    'deuda_id': str(next_id),
-                    'producto_id': str(item['producto_id']),
-                    'cantidad': item['cantidad']
-                }
-                
-                db_firestore.collection('productos_deuda').add(producto_deuda_data)
-                
-                # Actualizar inventario (reducir cantidad)
-                producto_ref.update({
-                    'cantidad': firestore.Increment(-item['cantidad'])
-                })
-            
-            # Actualizar contador
-            counter_ref = db_firestore.collection('counters').document('deudas')
-            counter_ref.update({'seq': Increment(1)})
-            
-            # Limpiar sesión
-            session.pop('productos_deuda', None)
-            session.pop('cliente_seleccionado', None)
-            
-            flash('Deuda registrada exitosamente', 'success')
-            return redirect(url_for('consultar_deudas'))
-            
-        except Exception as e:
-            print(f"Error al registrar deuda: {e}")
-            flash('Error al registrar la deuda', 'danger')
+            # Actualizar inventario (reducir cantidad)
+            producto_ref.update({
+                'cantidad': firestore.Increment(-item['cantidad'])
+            })
+        
+        print(f"Productos guardados: {productos_guardados}")
+        
+        # Actualizar contador
+        counter_ref = db_firestore.collection('counters').document('deudas')
+        counter_ref.update({'seq': Increment(1)})
+        
+        # Limpiar sesión
+        session.pop('productos_deuda', None)
+        session.pop('cliente_seleccionado', None)
+        
+        print("=== DEUDA REGISTRADA EXITOSAMENTE ===")
+        flash('Deuda registrada exitosamente', 'success')
+        return redirect(url_for('consultar_deudas'))
+        
+    except Exception as e:
+        print(f"ERROR al registrar deuda: {e}")
+        import traceback
+        traceback.print_exc()
+        flash('Error al registrar la deuda', 'danger')
     
     # Obtener detalles de productos para mostrar
     productos_en_deuda = []
