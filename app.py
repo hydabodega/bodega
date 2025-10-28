@@ -588,12 +588,26 @@ def registrar_deuda():
     producto_form = ProductoDeudaForm()
     
     # Poblar opciones del formulario
-    deuda_form.cliente_id.choices = [('', 'Seleccione un cliente')] + [(c['id'], f"{c['nombre']} ({c['cedula']})") for c in clientes]
+    deuda_form.cliente_id.choices = [('', 'Seleccione un cliente')] + [(c['id'], f"{c['nombre']}") for c in clientes]
     producto_form.producto_id.choices = [('', 'Seleccione un producto')] + [(p['id'], p['nombre']) for p in productos]
     
     # Inicializar lista de productos en sesión
     if 'productos_deuda' not in session:
         session['productos_deuda'] = []
+    
+    # Manejar selección de cliente (nuevo)
+    if request.method == 'POST' and 'select_cliente' in request.form:
+        cliente_id = request.form.get('cliente_id')
+        if cliente_id:
+            deuda_form.cliente_id.data = cliente_id
+            # Guardar en sesión para persistencia
+            session['cliente_seleccionado'] = cliente_id
+            flash(f'Cliente seleccionado correctamente', 'success')
+        return redirect(url_for('registrar_deuda'))
+    
+    # Cargar cliente seleccionado de la sesión si existe
+    if 'cliente_seleccionado' in session:
+        deuda_form.cliente_id.data = session['cliente_seleccionado']
     
     # Manejar agregar producto
     if producto_form.agregar.data and producto_form.validate():
