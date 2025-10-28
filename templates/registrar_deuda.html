@@ -31,7 +31,7 @@
                         <input type="text" id="searchClient" class="form-control" placeholder="Escribe el nombre del cliente...">
                     </div>
 
-                    <!-- Lista de clientes SOLO NOMBRE -->
+                    <!-- Lista de clientes -->
                     <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
                         <table class="table table-hover">
                             <thead>
@@ -69,16 +69,10 @@
 
                     <!-- Información del cliente seleccionado -->
                     {% if cliente_seleccionado_info %}
-                    <div id="selectedClientInfo" class="alert alert-info mt-3">
+                    <div class="alert alert-info mt-3">
                         <i class="bi bi-check-circle me-2"></i>
                         <strong>Cliente seleccionado: </strong>
-                        <span id="currentSelectedClient">{{ cliente_seleccionado_info.nombre }}</span>
-                    </div>
-                    {% else %}
-                    <div id="selectedClientInfo" class="alert alert-info mt-3" style="display: none;">
-                        <i class="bi bi-check-circle me-2"></i>
-                        <strong>Cliente seleccionado: </strong>
-                        <span id="currentSelectedClient"></span>
+                        <span>{{ cliente_seleccionado_info.nombre }}</span>
                     </div>
                     {% endif %}
                 </div>
@@ -86,32 +80,37 @@
 
             <!-- Sección Productos -->
             {% if cliente_seleccionado_id %}
-            <div id="productsSection" class="card shadow-sm mb-4">
-            {% else %}
-            <div id="productsSection" class="card shadow-sm mb-4" style="display: none;">
-            {% endif %}
+            <div class="card shadow-sm mb-4">
                 <div class="card-header bg-info text-white">
                     <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Agregar Productos</h5>
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('registrar_deuda') }}">
-                        {{ producto_form.hidden_tag() }}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                {{ producto_form.producto_id.label(class="form-label fw-semibold") }}
-                                {{ producto_form.producto_id(class="form-select") }}
+                                <label class="form-label fw-semibold">Producto</label>
+                                <select name="producto_id" class="form-select" required>
+                                    <option value="">Seleccione un producto</option>
+                                    {% for producto in productos %}
+                                    <option value="{{ producto.id }}">{{ producto.nombre }} - ${{ producto.precio }} (Stock: {{ producto.cantidad }})</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="col-md-4">
-                                {{ producto_form.cantidad.label(class="form-label fw-semibold") }}
-                                {{ producto_form.cantidad(class="form-control", placeholder="1", value="1") }}
+                                <label class="form-label fw-semibold">Cantidad</label>
+                                <input type="number" name="cantidad" class="form-control" placeholder="1" value="1" min="1" required>
                             </div>
                             <div class="col-md-2 d-flex align-items-end">
-                                {{ producto_form.agregar(class="btn btn-primary w-100") }}
+                                <button type="submit" name="agregar" class="btn btn-primary w-100">
+                                    <i class="bi bi-plus-circle me-1"></i> Agregar
+                                </button>
                             </div>
                         </div>
                     </form>
                 </div>
             </div>
+            {% endif %}
         </div>
 
         <!-- Resumen -->
@@ -122,15 +121,9 @@
                 </div>
                 <div class="card-body">
                     {% if cliente_seleccionado_info %}
-                    <div id="resumenCliente" class="mb-3">
+                    <div class="mb-3">
                         <h6>Cliente:</h6>
-                        <p id="clienteResumen" class="fw-bold text-primary">{{ cliente_seleccionado_info.nombre }}</p>
-                        <hr>
-                    </div>
-                    {% else %}
-                    <div id="resumenCliente" class="mb-3" style="display: none;">
-                        <h6>Cliente:</h6>
-                        <p id="clienteResumen" class="fw-bold text-primary"></p>
+                        <p class="fw-bold text-primary">{{ cliente_seleccionado_info.nombre }}</p>
                         <hr>
                     </div>
                     {% endif %}
@@ -141,21 +134,22 @@
                         </div>
                         <div class="text-center mb-4">
                             <div class="display-6 text-primary fw-bold">
-                                ${{ total|round(2) }}
+                                ${{ "%.2f"|format(total) }}
                             </div>
                             <small class="text-muted">USD</small>
                         </div>
                         
                         <!-- Formulario para guardar deuda -->
+                        {% if cliente_seleccionado_id and productos_deuda %}
                         <form method="POST" action="{{ url_for('registrar_deuda') }}">
-                            {{ deuda_form.hidden_tag() }}
-                            <input type="hidden" name="cliente_id" value="{{ cliente_seleccionado_id }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <div class="d-grid">
                                 <button type="submit" name="guardar" class="btn btn-success btn-lg">
                                     <i class="bi bi-check-circle me-2"></i> Registrar Deuda
                                 </button>
                             </div>
                         </form>
+                        {% endif %}
                     {% else %}
                         <div class="text-center text-muted">
                             <i class="bi bi-cart-x fs-1 mb-3"></i>
@@ -202,10 +196,11 @@
                                     <td class="text-center">
                                         <span class="badge bg-info fs-6">{{ producto.cantidad }}</span>
                                     </td>
-                                    <td class="text-end">${{ producto.precio|round(2) }}</td>
-                                    <td class="text-end fw-bold">${{ producto.subtotal|round(2) }}</td>
+                                    <td class="text-end">${{ "%.2f"|format(producto.precio) }}</td>
+                                    <td class="text-end fw-bold">${{ "%.2f"|format(producto.subtotal) }}</td>
                                     <td class="text-center">
                                         <form method="POST" action="{{ url_for('eliminar_producto_temp', index=loop.index0) }}" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                             <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar este producto?')">
                                                 <i class="bi bi-trash"></i>
                                             </button>
@@ -218,7 +213,7 @@
                                 <tr>
                                     <td colspan="3" class="text-end fw-bold fs-5">Total:</td>
                                     <td class="text-end fw-bold fs-5 text-primary">
-                                        ${{ total|round(2) }} USD
+                                        ${{ "%.2f"|format(total) }} USD
                                     </td>
                                     <td></td>
                                 </tr>
@@ -234,6 +229,7 @@
 
 <!-- Formulario oculto para enviar la selección del cliente -->
 <form method="POST" action="{{ url_for('registrar_deuda') }}" id="clientSelectForm" style="display: none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <input type="hidden" name="cliente_id" id="hiddenClienteId">
     <input type="hidden" name="select_cliente" value="1">
 </form>
@@ -242,21 +238,10 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("DOM cargado - Inicializando funcionalidad...");
-    
-    // Elementos del DOM
+    // Búsqueda de clientes por nombre
     const searchInput = document.getElementById('searchClient');
     const clientRows = document.querySelectorAll('.client-row');
-    const clientRadios = document.querySelectorAll('.client-radio');
-    const selectedClientInfo = document.getElementById('selectedClientInfo');
-    const currentSelectedClient = document.getElementById('currentSelectedClient');
-    const productsSection = document.getElementById('productsSection');
-    const resumenCliente = document.getElementById('resumenCliente');
-    const clienteResumen = document.getElementById('clienteResumen');
-    const hiddenClienteId = document.getElementById('hiddenClienteId');
-    const clientSelectForm = document.getElementById('clientSelectForm');
-
-    // Búsqueda de clientes por nombre
+    
     if (searchInput && clientRows.length > 0) {
         searchInput.addEventListener('input', function() {
             const searchText = this.value.toLowerCase().trim();
@@ -273,44 +258,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Selección de cliente
+    const clientRadios = document.querySelectorAll('.client-radio');
+    const hiddenClienteId = document.getElementById('hiddenClienteId');
+    const clientSelectForm = document.getElementById('clientSelectForm');
+
     if (clientRadios.length > 0) {
         clientRadios.forEach(radio => {
             radio.addEventListener('change', function() {
                 if (this.checked) {
                     const clientId = this.getAttribute('data-client-id');
-                    const clientName = this.getAttribute('data-client-name');
                     
-                    console.log("Cliente seleccionado:", clientName, "ID:", clientId);
-                    
-                    // Actualizar la información del cliente seleccionado
-                    if (currentSelectedClient) {
-                        currentSelectedClient.textContent = clientName;
-                    }
-                    if (selectedClientInfo) {
-                        selectedClientInfo.style.display = 'block';
-                    }
-                    
-                    // Actualizar el resumen
-                    if (clienteResumen) {
-                        clienteResumen.textContent = clientName;
-                    }
-                    if (resumenCliente) {
-                        resumenCliente.style.display = 'block';
-                    }
-                    
-                    // Actualizar el campo hidden
                     if (hiddenClienteId) {
                         hiddenClienteId.value = clientId;
                     }
                     
-                    // Mostrar la sección de productos
-                    if (productsSection) {
-                        productsSection.style.display = 'block';
-                    }
-                    
-                    // Enviar el formulario automáticamente para guardar la selección
                     if (clientSelectForm) {
-                        console.log("Enviando formulario de selección de cliente...");
                         clientSelectForm.submit();
                     }
                 }
