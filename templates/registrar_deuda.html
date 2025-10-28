@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container py-4">
-    <!-- Header moderno -->
+    <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex align-items-center mb-3">
@@ -17,153 +17,134 @@
         </div>
     </div>
 
-    <!-- Indicador de pasos -->
-    <div class="step-indicator mb-4">
-        <div class="step active" data-step="1">
-            <div class="step-number">1</div>
-            <div class="step-label">Seleccionar Cliente</div>
-        </div>
-        <div class="step" data-step="2">
-            <div class="step-number">2</div>
-            <div class="step-label">Agregar Productos</div>
-        </div>
-        <div class="step" data-step="3">
-            <div class="step-number">3</div>
-            <div class="step-label">Confirmar</div>
-        </div>
-    </div>
-
     <div class="row">
-        <!-- Paso 1: Seleccionar Cliente -->
-        <div class="col-lg-8" id="step1-content">
+        <!-- Sección Clientes -->
+        <div class="col-lg-8">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-person me-2"></i>Paso 1: Seleccionar Cliente</h5>
+                    <h5 class="mb-0"><i class="bi bi-person me-2"></i>Seleccionar Cliente</h5>
                 </div>
                 <div class="card-body">
-                    <div class="search-box mb-3">
-                        <i class="bi bi-search"></i>
-                        <input type="text" id="searchClient" class="form-control" placeholder="Buscar cliente por nombre, cédula...">
+                    <!-- Búsqueda por nombre -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Buscar Cliente por Nombre</label>
+                        <input type="text" id="searchClient" class="form-control" placeholder="Escribe el nombre del cliente...">
                     </div>
-                    
-                    <div class="table-responsive" style="max-height: 300px;">
+
+                    <!-- Lista de clientes SOLO NOMBRE -->
+                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
                         <table class="table table-hover">
                             <thead>
                                 <tr>
                                     <th>Seleccionar</th>
-                                    <th>Nombre</th>
-                                    <th>Cédula/RIF</th>
-                                    <th>Teléfono</th>
+                                    <th>Nombre del Cliente</th>
                                 </tr>
                             </thead>
                             <tbody id="clientsList">
                                 {% for cliente in clientes %}
-                                <tr class="client-row" data-client-id="{{ cliente.id }}">
-                                    <td>
+                                <tr class="client-row" data-client-name="{{ cliente.nombre.lower() }}">
+                                    <td width="80">
                                         <div class="form-check">
-                                            <input class="form-check-input client-checkbox" type="radio" 
-                                                   name="clientRadio" data-client-id="{{ cliente.id }}">
+                                            <input class="form-check-input client-radio" type="radio" 
+                                                   name="clientRadio" 
+                                                   data-client-id="{{ cliente.id }}"
+                                                   data-client-name="{{ cliente.nombre }}">
                                         </div>
                                     </td>
-                                    <td>{{ cliente.nombre }}</td>
-                                    <td>{{ cliente.cedula or cliente.rif or 'N/A' }}</td>
-                                    <td>{{ cliente.telefono or 'N/A' }}</td>
+                                    <td>
+                                        <strong>{{ cliente.nombre }}</strong>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted py-3">
+                                        No hay clientes registrados
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                    
-                    <div class="d-flex justify-content-end mt-3">
-                        <button class="btn btn-primary" id="nextToStep2" disabled>
-                            Siguiente <i class="bi bi-arrow-right ms-2"></i>
-                        </button>
+
+                    <!-- Información del cliente seleccionado -->
+                    <div id="selectedClientInfo" class="alert alert-info mt-3" style="display: none;">
+                        <i class="bi bi-check-circle me-2"></i>
+                        <strong>Cliente seleccionado: </strong>
+                        <span id="currentSelectedClient"></span>
+                        <input type="hidden" id="selectedClientId" name="selected_client_id">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección Productos (solo se muestra cuando hay cliente seleccionado) -->
+            <div id="productsSection" style="display: none;">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Agregar Productos</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('registrar_deuda') }}">
+                            {{ producto_form.hidden_tag() }}
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    {{ producto_form.producto_id.label(class="form-label fw-semibold") }}
+                                    {{ producto_form.producto_id(class="form-select") }}
+                                </div>
+                                <div class="col-md-4">
+                                    {{ producto_form.cantidad.label(class="form-label fw-semibold") }}
+                                    {{ producto_form.cantidad(class="form-control", placeholder="1", value="1") }}
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    {{ producto_form.agregar(class="btn btn-primary w-100") }}
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Paso 2: Agregar Productos -->
-        <div class="col-lg-8" id="step2-content" style="display: none;">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="bi bi-cart me-2"></i>Paso 2: Agregar Productos</h5>
-                </div>
-                <div class="card-body">
-                    <div class="alert alert-info d-flex align-items-center mb-3">
-                        <i class="bi bi-info-circle me-2"></i>
-                        <span>Cliente seleccionado: <strong id="selectedClientName"></strong></span>
-                    </div>
-
-                    <!-- Búsqueda y filtros de productos -->
-                    <div class="search-box mb-3">
-                        <i class="bi bi-search"></i>
-                        <input type="text" id="searchProduct" class="form-control" placeholder="Buscar productos...">
-                    </div>
-
-                    <!-- Formulario para agregar productos -->
-                    <form method="POST" action="{{ url_for('registrar_deuda') }}" id="productoForm">
-                        {{ producto_form.hidden_tag() }}
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-6">
-                                {{ producto_form.producto_id.label(class="form-label fw-semibold") }}
-                                {{ producto_form.producto_id(class="form-select") }}
-                            </div>
-                            <div class="col-md-4">
-                                {{ producto_form.cantidad.label(class="form-label fw-semibold") }}
-                                {{ producto_form.cantidad(class="form-control", id="cantidadInput", value="1") }}
-                            </div>
-                            <div class="col-md-2 d-flex align-items-end">
-                                <button type="button" class="btn btn-primary w-100" id="agregarProductoBtn">
-                                    <i class="bi bi-plus-circle me-1"></i> Agregar
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-
-                    <div class="nav-buttons">
-                        <button class="btn btn-outline-secondary" id="backToStep1">
-                            <i class="bi bi-arrow-left me-2"></i> Anterior
-                        </button>
-                        <button class="btn btn-primary" id="nextToStep3" disabled>
-                            Siguiente <i class="bi bi-arrow-right ms-2"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Resumen lateral -->
+        <!-- Resumen -->
         <div class="col-lg-4">
             <div class="card shadow-sm sticky-top" style="top: 20px;">
                 <div class="card-header bg-success text-white">
-                    <h5 class="mb-0"><i class="bi bi-receipt me-2"></i>Resumen</h5>
+                    <h5 class="mb-0"><i class="bi bi-receipt me-2"></i>Resumen de Deuda</h5>
                 </div>
                 <div class="card-body">
                     <div id="resumenCliente" class="mb-3" style="display: none;">
                         <h6>Cliente:</h6>
-                        <p id="clienteResumen" class="fw-bold"></p>
+                        <p id="clienteResumen" class="fw-bold text-primary"></p>
                         <hr>
                     </div>
                     
-                    <div id="resumenProductos">
-                        {% if productos_deuda %}
-                            <div class="mb-3">
-                                <small class="text-muted">Productos: {{ productos_deuda|length }}</small>
+                    {% if productos_deuda %}
+                        <div class="mb-3">
+                            <small class="text-muted">Productos: {{ productos_deuda|length }}</small>
+                        </div>
+                        <div class="text-center mb-4">
+                            <div class="display-6 text-primary fw-bold">
+                                ${{ total|round(2) }}
                             </div>
-                            <div class="text-center">
-                                <div class="display-6 text-primary fw-bold">
-                                    ${{ total|round(2) if total else '0.00' }}
-                                </div>
-                                <small class="text-muted">USD</small>
+                            <small class="text-muted">USD</small>
+                        </div>
+                        
+                        <!-- Formulario para guardar deuda -->
+                        <form method="POST" action="{{ url_for('registrar_deuda') }}">
+                            {{ deuda_form.hidden_tag() }}
+                            <input type="hidden" name="cliente_id" id="formClienteId">
+                            <div class="d-grid">
+                                <button type="submit" name="guardar" class="btn btn-success btn-lg">
+                                    <i class="bi bi-check-circle me-2"></i> Registrar Deuda
+                                </button>
                             </div>
-                        {% else %}
-                            <div class="text-center text-muted">
-                                <i class="bi bi-cart-x fs-1 mb-3"></i>
-                                <p>No hay productos</p>
-                            </div>
-                        {% endif %}
-                    </div>
+                        </form>
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="bi bi-cart-x fs-1 mb-3"></i>
+                            <p>No hay productos agregados</p>
+                            <small>Selecciona un cliente y agrega productos</small>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -175,7 +156,7 @@
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-light">
-                    <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Productos en la Deuda</h5>
+                    <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Productos Agregados</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -201,7 +182,7 @@
                                         </div>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-info">{{ producto.cantidad }}</span>
+                                        <span class="badge bg-info fs-6">{{ producto.cantidad }}</span>
                                     </td>
                                     <td class="text-end">${{ producto.precio|round(2) }}</td>
                                     <td class="text-end fw-bold">${{ producto.subtotal|round(2) }}</td>
@@ -215,6 +196,15 @@
                                 </tr>
                                 {% endfor %}
                             </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="3" class="text-end fw-bold fs-5">Total:</td>
+                                    <td class="text-end fw-bold fs-5 text-primary">
+                                        ${{ total|round(2) }} USD
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 </div>
@@ -223,263 +213,143 @@
     </div>
     {% endif %}
 </div>
-
-<!-- Modal para confirmar deuda -->
-<div class="modal fade" id="confirmarDeudaModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Confirmar Deuda</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>¿Estás seguro de que deseas registrar esta deuda?</p>
-                <div class="alert alert-info">
-                    <strong>Cliente:</strong> <span id="confirmClienteNombre"></span><br>
-                    <strong>Total:</strong> $<span id="confirmTotal"></span> USD
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form method="POST" action="{{ url_for('registrar_deuda') }}" id="finalDeudaForm">
-                    {{ deuda_form.hidden_tag() }}
-                    <input type="hidden" name="cliente_id" id="finalClienteId">
-                    <button type="submit" class="btn btn-success" name="guardar">
-                        <i class="bi bi-check-circle me-2"></i> Confirmar Deuda
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    let selectedClient = null;
-    let currentStep = 1;
-
-    // Navegación entre pasos
-    function showStep(step) {
-        // Ocultar todos los pasos
-        document.getElementById('step1-content').style.display = 'none';
-        document.getElementById('step2-content').style.display = 'none';
+    // Búsqueda de clientes por nombre
+    const searchInput = document.getElementById('searchClient');
+    const clientRows = document.querySelectorAll('.client-row');
+    
+    searchInput.addEventListener('input', function() {
+        const searchText = this.value.toLowerCase().trim();
         
-        // Mostrar paso actual
-        if (step === 1) {
-            document.getElementById('step1-content').style.display = 'block';
-        } else if (step === 2) {
-            document.getElementById('step2-content').style.display = 'block';
-        }
-        
-        // Actualizar indicador
-        document.querySelectorAll('.step').forEach((stepEl, index) => {
-            if (index + 1 <= step) {
-                stepEl.classList.add('active');
+        clientRows.forEach(row => {
+            const clientName = row.getAttribute('data-client-name');
+            if (clientName.includes(searchText)) {
+                row.style.display = '';
             } else {
-                stepEl.classList.remove('active');
+                row.style.display = 'none';
             }
-        });
-        
-        currentStep = step;
-    }
-
-    // Búsqueda de clientes
-    $('#searchClient').on('input', function() {
-        const searchText = $(this).val().toLowerCase();
-        $('.client-row').each(function() {
-            const rowText = $(this).text().toLowerCase();
-            $(this).toggle(rowText.includes(searchText));
         });
     });
 
     // Selección de cliente
-    $('.client-checkbox').click(function() {
-        $('.client-checkbox').prop('checked', false);
-        $(this).prop('checked', true);
-        
-        const row = $(this).closest('.client-row');
-        const clientId = row.data('client-id');
-        const clientName = row.find('td:nth-child(2)').text();
-        const clientCedula = row.find('td:nth-child(3)').text();
-        
-        selectedClient = {
-            id: clientId,
-            name: clientName,
-            cedula: clientCedula
-        };
-        
-        // Actualizar resumen
-        $('#clienteResumen').text(`${clientName} (${clientCedula})`);
-        $('#resumenCliente').show();
-        
-        // Habilitar siguiente paso
-        $('#nextToStep2').prop('disabled', false);
+    const clientRadios = document.querySelectorAll('.client-radio');
+    const selectedClientInfo = document.getElementById('selectedClientInfo');
+    const currentSelectedClient = document.getElementById('currentSelectedClient');
+    const productsSection = document.getElementById('productsSection');
+    const resumenCliente = document.getElementById('resumenCliente');
+    const clienteResumen = document.getElementById('clienteResumen');
+    const formClienteId = document.getElementById('formClienteId');
+
+    clientRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.checked) {
+                const clientId = this.getAttribute('data-client-id');
+                const clientName = this.getAttribute('data-client-name');
+                
+                // Actualizar la información del cliente seleccionado
+                currentSelectedClient.textContent = clientName;
+                selectedClientInfo.style.display = 'block';
+                
+                // Actualizar el resumen
+                clienteResumen.textContent = clientName;
+                resumenCliente.style.display = 'block';
+                formClienteId.value = clientId;
+                
+                // Mostrar la sección de productos
+                productsSection.style.display = 'block';
+                
+                // Scroll suave a la sección de productos
+                productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                showToast(`Cliente seleccionado: ${clientName}`, 'success');
+            }
+        });
     });
 
-    // Navegación
-    $('#nextToStep2').click(function() {
-        if (selectedClient) {
-            $('#selectedClientName').text(selectedClient.name);
-            showStep(2);
-        }
+    // También permitir selección al hacer clic en la fila completa
+    clientRows.forEach(row => {
+        row.addEventListener('click', function(e) {
+            if (e.target.type !== 'radio') {
+                const radio = this.querySelector('.client-radio');
+                radio.checked = true;
+                radio.dispatchEvent(new Event('change'));
+            }
+        });
     });
 
-    $('#backToStep1').click(function() {
-        showStep(1);
-    });
-
-    // Agregar producto con validación
-    $('#agregarProductoBtn').click(function() {
-        const productoId = $('#producto_id').val();
-        const cantidad = $('#cantidadInput').val();
-
-        if (!productoId) {
-            showToast('Selecciona un producto', 'error');
-            return;
-        }
-
-        if (!cantidad || cantidad < 1) {
-            showToast('Ingresa una cantidad válida', 'error');
-            return;
-        }
-
-        // Verificar stock antes de agregar
-        fetch(`/api/producto/${productoId}`)
-            .then(response => response.json())
-            .then(producto => {
-                if (cantidad > producto.cantidad) {
-                    showToast(`No hay suficiente stock. Disponible: ${producto.cantidad}`, 'error');
-                    return;
-                }
-
-                // Enviar formulario si hay stock
-                $('#productoForm').submit();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                // Enviar formulario incluso si hay error (fallback)
-                $('#productoForm').submit();
-            });
-    });
-
-    // Confirmar deuda
-    $('#nextToStep3').click(function() {
-        if (selectedClient) {
-            $('#confirmClienteNombre').text(selectedClient.name);
-            $('#confirmTotal').text('{{ total|round(2) if total else "0.00" }}');
-            $('#finalClienteId').val(selectedClient.id);
+    // Función para mostrar notificaciones
+    function showToast(message, type = 'info') {
+        // Usar el toast de Bootstrap si existe
+        const toastEl = document.getElementById('globalToast');
+        if (toastEl) {
+            const toastBody = toastEl.querySelector('.toast-body');
+            const toast = new bootstrap.Toast(toastEl);
+            toastBody.textContent = message;
             
-            const modal = new bootstrap.Modal(document.getElementById('confirmarDeudaModal'));
-            modal.show();
+            // Cambiar color según el tipo
+            const toastHeader = toastEl.querySelector('.toast-header strong');
+            if (type === 'success') {
+                toastHeader.innerHTML = '<i class="bi bi-check-circle-fill text-success me-2"></i>Éxito';
+            } else if (type === 'error') {
+                toastHeader.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Error';
+            } else {
+                toastHeader.innerHTML = '<i class="bi bi-info-circle-fill text-info me-2"></i>Información';
+            }
+            
+            toast.show();
+        } else {
+            // Fallback: alert simple
+            alert(message);
         }
-    });
+    }
 
-    // Inicializar Select2 para mejor UX
-    $('#producto_id').select2({
-        placeholder: "Selecciona un producto",
-        allowClear: true
-    });
-
-    // Búsqueda de productos
-    $('#searchProduct').on('input', function() {
-        const searchText = $(this).val().toLowerCase();
-        // Esto sería mejor con una API, pero por ahora filtramos client-side
-    });
-
-    // Habilitar siguiente paso si hay productos
-    {% if productos_deuda and productos_deuda|length > 0 %}
-        $('#nextToStep3').prop('disabled', false);
+    // Inicializar: si ya hay productos en la deuda, mostrar sección de productos
+    {% if productos_deuda and deuda_form.cliente_id.data %}
+        productsSection.style.display = 'block';
+        // Buscar el nombre del cliente seleccionado
+        {% for cliente in clientes %}
+            {% if cliente.id == deuda_form.cliente_id.data %}
+                currentSelectedClient.textContent = '{{ cliente.nombre }}';
+                clienteResumen.textContent = '{{ cliente.nombre }}';
+                selectedClientInfo.style.display = 'block';
+                resumenCliente.style.display = 'block';
+                // Marcar el radio button correspondiente
+                const radio = document.querySelector(`.client-radio[data-client-id="{{ cliente.id }}"]`);
+                if (radio) {
+                    radio.checked = true;
+                }
+            {% endif %}
+        {% endfor %}
     {% endif %}
 });
-
-// Estilos para el indicador de pasos
-const style = document.createElement('style');
-style.textContent = `
-    .step-indicator {
-        display: flex;
-        justify-content: center;
-        margin-bottom: 2rem;
-    }
-    
-    .step {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 0 1.5rem;
-        position: relative;
-    }
-    
-    .step-number {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: #e9ecef;
-        color: #6c757d;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-        transition: all 0.3s ease;
-    }
-    
-    .step.active .step-number {
-        background: #0d6efd;
-        color: white;
-        transform: scale(1.1);
-    }
-    
-    .step-label {
-        font-weight: 500;
-        color: #6c757d;
-        font-size: 0.875rem;
-    }
-    
-    .step.active .step-label {
-        color: #0d6efd;
-        font-weight: 600;
-    }
-    
-    .step:not(:last-child):after {
-        content: '';
-        position: absolute;
-        top: 20px;
-        right: -50%;
-        width: 100%;
-        height: 2px;
-        background: #e9ecef;
-    }
-    
-    .step.active:not(:last-child):after {
-        background: #0d6efd;
-    }
-
-    .search-box {
-        position: relative;
-    }
-    
-    .search-box i {
-        position: absolute;
-        left: 1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #6c757d;
-    }
-    
-    .search-box input {
-        padding-left: 2.5rem;
-    }
-
-    .nav-buttons {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 1.5rem;
-        padding-top: 1rem;
-        border-top: 1px solid #dee2e6;
-    }
-`;
-document.head.appendChild(style);
 </script>
+
+<style>
+.client-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.client-row:hover {
+    background-color: #f8f9fa;
+}
+
+.client-row:active {
+    background-color: #e9ecef;
+}
+
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+/* Estilo para la fila seleccionada */
+.client-row.selected {
+    background-color: #e3f2fd;
+}
+</style>
 {% endblock %}
