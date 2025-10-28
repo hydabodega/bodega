@@ -639,23 +639,21 @@ def registrar_deuda():
         session.modified = True
         return redirect(url_for('registrar_deuda'))
     
-    # Manejar guardar deuda
-if deuda_form.guardar.data and deuda_form.validate():
-    try:
-        print("=== INICIANDO REGISTRO DE DEUDA ===")
-        
-        # Validar que hay un cliente seleccionado
-        if not session.get('cliente_seleccionado'):
-            flash('Debe seleccionar un cliente', 'danger')
-            print("ERROR: No hay cliente seleccionado")
-            return redirect(url_for('registrar_deuda'))
+# Manejar guardar deuda - VERSIÓN ALTERNATIVA
+if request.method == 'POST' and 'guardar' in request.form:
+    print("=== DETECTADO BOTÓN GUARDAR ===")
+    
+    # Validar que hay un cliente seleccionado
+    if not session.get('cliente_seleccionado'):
+        flash('Debe seleccionar un cliente', 'danger')
+        return redirect(url_for('registrar_deuda'))
 
-        # Validar que hay productos en la deuda
-        if not session.get('productos_deuda'):
-            flash('Debe agregar al menos un producto a la deuda', 'danger')
-            print("ERROR: No hay productos en la deuda")
-            return redirect(url_for('registrar_deuda'))
-        
+    # Validar que hay productos en la deuda
+    if not session.get('productos_deuda'):
+        flash('Debe agregar al menos un producto a la deuda', 'danger')
+        return redirect(url_for('registrar_deuda'))
+    
+    try:
         # Obtener próximo ID secuencial
         next_id = get_next_sequence('deudas')
         print(f"ID de deuda generado: {next_id}")
@@ -667,11 +665,9 @@ if deuda_form.guardar.data and deuda_form.validate():
         
         if not cliente_doc.exists:
             flash('Cliente no encontrado', 'danger')
-            print(f"ERROR: Cliente {cliente_id} no encontrado")
             return redirect(url_for('registrar_deuda'))
         
         cliente_data = cliente_doc.to_dict()
-        print(f"Cliente: {cliente_data.get('nombre')}")
         
         # Crear datos de deuda
         deuda_data = {
@@ -688,7 +684,6 @@ if deuda_form.guardar.data and deuda_form.validate():
         print(f"Deuda guardada en Firestore: {next_id}")
         
         # Guardar productos asociados
-        productos_guardados = 0
         for item in session['productos_deuda']:
             producto_ref = db_firestore.collection('productos').document(str(item['producto_id']))
             
@@ -699,14 +694,11 @@ if deuda_form.guardar.data and deuda_form.validate():
             }
             
             db_firestore.collection('productos_deuda').add(producto_deuda_data)
-            productos_guardados += 1
             
             # Actualizar inventario (reducir cantidad)
             producto_ref.update({
                 'cantidad': firestore.Increment(-item['cantidad'])
             })
-        
-        print(f"Productos guardados: {productos_guardados}")
         
         # Actualizar contador
         counter_ref = db_firestore.collection('counters').document('deudas')
@@ -716,7 +708,6 @@ if deuda_form.guardar.data and deuda_form.validate():
         session.pop('productos_deuda', None)
         session.pop('cliente_seleccionado', None)
         
-        print("=== DEUDA REGISTRADA EXITOSAMENTE ===")
         flash('Deuda registrada exitosamente', 'success')
         return redirect(url_for('consultar_deudas'))
         
