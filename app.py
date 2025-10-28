@@ -564,6 +564,8 @@ def calcular_precio_sin_iva(precio_con_iva):
 @app.route('/registrar_deuda', methods=['GET', 'POST'])
 @login_required
 def registrar_deuda():
+    print("=== INICIANDO REGISTRAR_DEUDA ===")
+    
     # Obtener clientes ORDENADOS alfabéticamente por nombre
     clientes = []
     clientes_docs = db_firestore.collection('clientes').stream()
@@ -597,27 +599,49 @@ def registrar_deuda():
     
     # Manejar selección de cliente
     if request.method == 'POST' and 'select_cliente' in request.form:
+        print("=== MANEJANDO SELECCIÓN DE CLIENTE ===")
         cliente_id = request.form.get('cliente_id')
+        print(f"Cliente ID recibido: {cliente_id}")
+        
         if cliente_id:
             # Guardar en sesión
             session['cliente_seleccionado'] = cliente_id
             flash('Cliente seleccionado correctamente', 'success')
+            print(f"Cliente guardado en sesión: {cliente_id}")
+        else:
+            flash('Error al seleccionar cliente', 'danger')
+        
         return redirect(url_for('registrar_deuda'))
     
     # Cargar cliente seleccionado de la sesión si existe
     cliente_seleccionado_id = session.get('cliente_seleccionado')
     if cliente_seleccionado_id:
         deuda_form.cliente_id.data = cliente_seleccionado_id
+        print(f"Cliente cargado de sesión: {cliente_seleccionado_id}")
     
     # Manejar agregar producto
-    if producto_form.agregar.data and producto_form.validate():
+    if request.method == 'POST' and 'agregar' in request.form:
+        print("=== MANEJANDO AGREGAR PRODUCTO ===")
+        
         # Verificar que hay un cliente seleccionado
         if not session.get('cliente_seleccionado'):
             flash('Debe seleccionar un cliente primero', 'danger')
             return redirect(url_for('registrar_deuda'))
         
-        selected_product_id = str(producto_form.producto_id.data)
-        cantidad = producto_form.cantidad.data
+        selected_product_id = request.form.get('producto_id')
+        cantidad_str = request.form.get('cantidad')
+        
+        print(f"Producto ID: {selected_product_id}, Cantidad: {cantidad_str}")
+        
+        if not selected_product_id or not cantidad_str:
+            flash('Debe seleccionar un producto y cantidad', 'danger')
+            return redirect(url_for('registrar_deuda'))
+        
+        try:
+            cantidad = int(cantidad_str)
+        except ValueError:
+            flash('Cantidad debe ser un número válido', 'danger')
+            return redirect(url_for('registrar_deuda'))
 
         # Verificar stock disponible
         producto_ref = db_firestore.collection('productos').document(selected_product_id)
@@ -627,95 +651,117 @@ def registrar_deuda():
             producto_data = producto_doc.to_dict()
             stock_actual = producto_data.get('cantidad', 0)
             
+            print(f"Stock actual: {stock_actual}, Cantidad solicitada: {cantidad}")
+            
             if cantidad > stock_actual:
                 flash(f'No hay suficiente stock. Disponible: {stock_actual}', 'danger')
                 return redirect(url_for('registrar_deuda'))
+            
+            # Agregar producto si hay stock suficiente
+            session['productos_deuda'].append({
+                'producto_id': selected_product_id,
+                'cantidad': cantidad
+            })
+            session.modified = True
+            print(f"Producto agregado. Total productos: {len(session['productos_deuda'])}")
+            flash('Producto agregado correctamente', 'success')
+        else:
+            flash('Producto no encontrado', 'danger')
         
-        # Agregar producto si hay stock suficiente
-        session['productos_deuda'].append({
-            'producto_id': selected_product_id,
-            'cantidad': cantidad
-        })
-        session.modified = True
         return redirect(url_for('registrar_deuda'))
     
-# Manejar guardar deuda - VERSIÓN ALTERNATIVA
-if request.method == 'POST' and 'guardar' in request.form:
-    print("=== DETECTADO BOTÓN GUARDAR ===")
-    
-    # Validar que hay un cliente seleccionado
-    if not session.get('cliente_seleccionado'):
-        flash('Debe seleccionar un cliente', 'danger')
-        return redirect(url_for('registrar_deuda'))
+    # Manejar guardar deuda COMPLETA
+    if request.method == 'POST' and 'guardar' in request.form:
+        print("=== MANEJANDO GUARDAR DEUDA COMPLETA ===")
+        
+        # Validar que hay un cliente seleccionado
+        if not session.get('cliente_seleccionado'):
+            flash('Debe seleccionar un cliente', 'danger')
+            print("ERROR: No hay cliente seleccionado")
+            return redirect(url_for('registrar_deuda'))
 
-    # Validar que hay productos en la deuda
-    if not session.get('productos_deuda'):
-        flash('Debe agregar al menos un producto a la deuda', 'danger')
-        return redirect(url_for('registrar_deuda'))
-    
-    try:
-        # Obtener próximo ID secuencial
-        next_id = get_next_sequence('deudas')
-        print(f"ID de deuda generado: {next_id}")
-        
-        # Obtener cliente de la sesión
-        cliente_id = session['cliente_seleccionado']
-        cliente_ref = db_firestore.collection('clientes').document(cliente_id)
-        cliente_doc = cliente_ref.get()
-        
-        if not cliente_doc.exists:
-            flash('Cliente no encontrado', 'danger')
+        # Validar que hay productos en la deuda
+        if not session.get('productos_deuda'):
+            flash('Debe agregar al menos un producto a la deuda', 'danger')
+            print("ERROR: No hay productos en la deuda")
             return redirect(url_for('registrar_deuda'))
         
-        cliente_data = cliente_doc.to_dict()
-        
-        # Crear datos de deuda
-        deuda_data = {
-            'cliente_id': cliente_ref,
-            'cliente_nombre': cliente_data.get('nombre', ''),
-            'cliente_cedula': cliente_data.get('cedula', ''),
-            'fecha': datetime.utcnow(),
-            'estado': 'pendiente'
-        }
-        
-        # Guardar deuda en Firestore
-        deuda_ref = db_firestore.collection('deudas').document(str(next_id))
-        deuda_ref.set(deuda_data)
-        print(f"Deuda guardada en Firestore: {next_id}")
-        
-        # Guardar productos asociados
-        for item in session['productos_deuda']:
-            producto_ref = db_firestore.collection('productos').document(str(item['producto_id']))
+        try:
+            # Obtener próximo ID secuencial
+            next_id = get_next_sequence('deudas')
+            print(f"ID de deuda generado: {next_id}")
             
-            producto_deuda_data = {
-                'deuda_id': str(next_id),
-                'producto_id': str(item['producto_id']),
-                'cantidad': item['cantidad']
+            # Obtener cliente de la sesión
+            cliente_id = session['cliente_seleccionado']
+            cliente_ref = db_firestore.collection('clientes').document(cliente_id)
+            cliente_doc = cliente_ref.get()
+            
+            if not cliente_doc.exists:
+                flash('Cliente no encontrado', 'danger')
+                print(f"ERROR: Cliente {cliente_id} no encontrado")
+                return redirect(url_for('registrar_deuda'))
+            
+            cliente_data = cliente_doc.to_dict()
+            print(f"Cliente: {cliente_data.get('nombre')}")
+            
+            # Crear datos de deuda
+            deuda_data = {
+                'cliente_id': cliente_ref,
+                'cliente_nombre': cliente_data.get('nombre', ''),
+                'cliente_cedula': cliente_data.get('cedula', ''),
+                'fecha': datetime.utcnow(),
+                'estado': 'pendiente'
             }
             
-            db_firestore.collection('productos_deuda').add(producto_deuda_data)
+            # Guardar deuda en Firestore
+            deuda_ref = db_firestore.collection('deudas').document(str(next_id))
+            deuda_ref.set(deuda_data)
+            print(f"Deuda guardada en Firestore: {next_id}")
             
-            # Actualizar inventario (reducir cantidad)
-            producto_ref.update({
-                'cantidad': firestore.Increment(-item['cantidad'])
-            })
-        
-        # Actualizar contador
-        counter_ref = db_firestore.collection('counters').document('deudas')
-        counter_ref.update({'seq': Increment(1)})
-        
-        # Limpiar sesión
-        session.pop('productos_deuda', None)
-        session.pop('cliente_seleccionado', None)
-        
-        flash('Deuda registrada exitosamente', 'success')
-        return redirect(url_for('consultar_deudas'))
-        
-    except Exception as e:
-        print(f"ERROR al registrar deuda: {e}")
-        import traceback
-        traceback.print_exc()
-        flash('Error al registrar la deuda', 'danger')
+            # Guardar productos asociados
+            productos_guardados = 0
+            for item in session['productos_deuda']:
+                producto_id = item['producto_id']
+                cantidad = item['cantidad']
+                
+                producto_ref = db_firestore.collection('productos').document(producto_id)
+                
+                producto_deuda_data = {
+                    'deuda_id': str(next_id),
+                    'producto_id': producto_id,
+                    'cantidad': cantidad
+                }
+                
+                # Guardar relación producto-deuda
+                db_firestore.collection('productos_deuda').add(producto_deuda_data)
+                productos_guardados += 1
+                
+                # Actualizar inventario (reducir cantidad)
+                producto_ref.update({
+                    'cantidad': firestore.Increment(-cantidad)
+                })
+                print(f"Producto {producto_id} - cantidad reducida en {cantidad}")
+            
+            print(f"Total productos guardados: {productos_guardados}")
+            
+            # Actualizar contador
+            counter_ref = db_firestore.collection('counters').document('deudas')
+            counter_ref.update({'seq': Increment(1)})
+            
+            # Limpiar sesión COMPLETAMENTE
+            session.pop('productos_deuda', None)
+            session.pop('cliente_seleccionado', None)
+            session.modified = True
+            
+            print("=== DEUDA REGISTRADA EXITOSAMENTE - REDIRIGIENDO A CONSULTAR_DEUDAS ===")
+            flash('Deuda registrada exitosamente', 'success')
+            return redirect(url_for('consultar_deudas'))
+            
+        except Exception as e:
+            print(f"ERROR al registrar deuda: {e}")
+            import traceback
+            traceback.print_exc()
+            flash('Error al registrar la deuda', 'danger')
     
     # Obtener detalles de productos para mostrar
     productos_en_deuda = []
@@ -754,6 +800,8 @@ if request.method == 'POST' and 'guardar' in request.form:
             if cliente['id'] == cliente_seleccionado_id:
                 cliente_seleccionado_info = cliente
                 break
+    
+    print(f"Renderizando template - Cliente seleccionado: {cliente_seleccionado_id}, Productos: {len(productos_en_deuda)}")
     
     return render_template('registrar_deuda.html', 
                           deuda_form=deuda_form,
