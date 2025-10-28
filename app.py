@@ -1199,26 +1199,6 @@ def gestion_deudas(cliente_id):
                           deudas_pendientes=deudas_pendientes,
                           deudas_pagadas=deudas_pagadas)
 
-@app.route('/api/producto/<string:producto_id>')
-@login_required
-def api_get_producto(producto_id):
-    try:
-        producto_ref = db_firestore.collection('productos').document(producto_id)
-        producto_doc = producto_ref.get()
-        
-        if producto_doc.exists:
-            producto = producto_doc.to_dict()
-            return jsonify({
-                'id': producto_id,
-                'nombre': producto.get('nombre', ''),
-                'cantidad': producto.get('cantidad', 0),
-                'precio': producto.get('precio', 0)
-            })
-        else:
-            return jsonify({'error': 'Producto no encontrado'}), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/marcar_pagada/<string:deuda_id>', methods=['POST'])
 @login_required
 def marcar_pagada(deuda_id):
