@@ -595,23 +595,27 @@ def registrar_deuda():
     if 'productos_deuda' not in session:
         session['productos_deuda'] = []
     
-    # Manejar selección de cliente (nuevo)
+    # Manejar selección de cliente
     if request.method == 'POST' and 'select_cliente' in request.form:
         cliente_id = request.form.get('cliente_id')
         if cliente_id:
-            deuda_form.cliente_id.data = cliente_id
-            # Guardar en sesión para persistencia
+            # Guardar en sesión
             session['cliente_seleccionado'] = cliente_id
-            flash(f'Cliente seleccionado correctamente', 'success')
+            flash('Cliente seleccionado correctamente', 'success')
         return redirect(url_for('registrar_deuda'))
     
     # Cargar cliente seleccionado de la sesión si existe
-    if 'cliente_seleccionado' in session:
-        deuda_form.cliente_id.data = session['cliente_seleccionado']
+    cliente_seleccionado_id = session.get('cliente_seleccionado')
+    if cliente_seleccionado_id:
+        deuda_form.cliente_id.data = cliente_seleccionado_id
     
     # Manejar agregar producto
     if producto_form.agregar.data and producto_form.validate():
-        # Validación de stock
+        # Verificar que hay un cliente seleccionado
+        if not session.get('cliente_seleccionado'):
+            flash('Debe seleccionar un cliente primero', 'danger')
+            return redirect(url_for('registrar_deuda'))
+        
         selected_product_id = str(producto_form.producto_id.data)
         cantidad = producto_form.cantidad.data
 
@@ -638,6 +642,11 @@ def registrar_deuda():
     # Manejar guardar deuda
     if deuda_form.guardar.data and deuda_form.validate():
         try:
+            # Validar que hay un cliente seleccionado
+            if not session.get('cliente_seleccionado'):
+                flash('Debe seleccionar un cliente', 'danger')
+                return redirect(url_for('registrar_deuda'))
+
             # Validar que hay productos en la deuda
             if not session.get('productos_deuda'):
                 flash('Debe agregar al menos un producto a la deuda', 'danger')
@@ -646,8 +655,9 @@ def registrar_deuda():
             # Obtener próximo ID secuencial
             next_id = get_next_sequence('deudas')
             
-            # Obtener cliente
-            cliente_ref = db_firestore.collection('clientes').document(str(deuda_form.cliente_id.data))
+            # Obtener cliente de la sesión
+            cliente_id = session['cliente_seleccionado']
+            cliente_ref = db_firestore.collection('clientes').document(cliente_id)
             cliente_doc = cliente_ref.get()
             if not cliente_doc.exists:
                 flash('Cliente no encontrado', 'danger')
@@ -691,6 +701,7 @@ def registrar_deuda():
             
             # Limpiar sesión
             session.pop('productos_deuda', None)
+            session.pop('cliente_seleccionado', None)
             
             flash('Deuda registrada exitosamente', 'success')
             return redirect(url_for('consultar_deudas'))
@@ -701,7 +712,7 @@ def registrar_deuda():
     
     # Obtener detalles de productos para mostrar
     productos_en_deuda = []
-    for item in session['productos_deuda']:
+    for item in session.get('productos_deuda', []):
         producto_ref = db_firestore.collection('productos').document(str(item['producto_id']))
         producto_doc = producto_ref.get()
         if producto_doc.exists:
@@ -729,12 +740,22 @@ def registrar_deuda():
     # Calcular el total de la deuda
     total_deuda = sum(item['subtotal'] for item in productos_en_deuda)
     
+    # Obtener información del cliente seleccionado para la plantilla
+    cliente_seleccionado_info = None
+    if cliente_seleccionado_id:
+        for cliente in clientes:
+            if cliente['id'] == cliente_seleccionado_id:
+                cliente_seleccionado_info = cliente
+                break
+    
     return render_template('registrar_deuda.html', 
                           deuda_form=deuda_form,
                           producto_form=producto_form,
                           productos_deuda=productos_en_deuda,
                           total=total_deuda,
-                          clientes=clientes,  # Asegurar que se pasan los clientes
+                          clientes=clientes,
+                          cliente_seleccionado_id=cliente_seleccionado_id,
+                          cliente_seleccionado_info=cliente_seleccionado_info,
                           form=EmptyForm())
 
 @app.route('/consultar_deudas')
