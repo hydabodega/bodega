@@ -641,6 +641,9 @@ def registrar_deuda():
     
     # Manejar guardar deuda
     if deuda_form.guardar.data and deuda_form.validate():
+        print("=== INICIANDO REGISTRO DE DEUDA ===")
+        print(f"Cliente seleccionado: {session.get('cliente_seleccionado')}")
+        print(f"Productos en deuda: {session.get('productos_deuda')}")
         try:
             # Validar que hay un cliente seleccionado
             if not session.get('cliente_seleccionado'):
