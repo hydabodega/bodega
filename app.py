@@ -564,7 +564,7 @@ def calcular_precio_sin_iva(precio_con_iva):
 @app.route('/registrar_deuda', methods=['GET', 'POST'])
 @login_required
 def registrar_deuda():
-    # Obtener clientes
+    # Obtener clientes ORDENADOS alfabéticamente por nombre
     clientes = []
     clientes_docs = db_firestore.collection('clientes').stream()
     for doc in clientes_docs:
@@ -572,6 +572,9 @@ def registrar_deuda():
         cliente['id'] = doc.id
         clientes.append(cliente)
     
+    # Ordenar clientes alfabéticamente por nombre
+    clientes.sort(key=lambda x: x['nombre'].lower())
+
     # Obtener productos
     productos = []
     productos_docs = db_firestore.collection('productos').stream()
@@ -579,14 +582,14 @@ def registrar_deuda():
         prod = doc.to_dict()
         prod['id'] = doc.id
         productos.append(prod)
-    
+
     # Crear formularios
     deuda_form = DeudaForm()
     producto_form = ProductoDeudaForm()
     
     # Poblar opciones del formulario
-    deuda_form.cliente_id.choices = [(c['id'], f"{c['nombre']} ({c['cedula']})") for c in clientes]
-    producto_form.producto_id.choices = [(p['id'], p['nombre']) for p in productos]
+    deuda_form.cliente_id.choices = [('', 'Seleccione un cliente')] + [(c['id'], f"{c['nombre']} ({c['cedula']})") for c in clientes]
+    producto_form.producto_id.choices = [('', 'Seleccione un producto')] + [(p['id'], p['nombre']) for p in productos]
     
     # Inicializar lista de productos en sesión
     if 'productos_deuda' not in session:
@@ -594,7 +597,7 @@ def registrar_deuda():
     
     # Manejar agregar producto
     if producto_form.agregar.data and producto_form.validate():
-        # USAR ESTE BLOQUE DE VALIDACIÓN DE STOCK
+        # Validación de stock
         selected_product_id = str(producto_form.producto_id.data)
         cantidad = producto_form.cantidad.data
 
@@ -621,7 +624,12 @@ def registrar_deuda():
     # Manejar guardar deuda
     if deuda_form.guardar.data and deuda_form.validate():
         try:
-            # Obtener próximo ID secuencial - ESTA ES LA LÍNEA FALTANTE
+            # Validar que hay productos en la deuda
+            if not session.get('productos_deuda'):
+                flash('Debe agregar al menos un producto a la deuda', 'danger')
+                return redirect(url_for('registrar_deuda'))
+            
+            # Obtener próximo ID secuencial
             next_id = get_next_sequence('deudas')
             
             # Obtener cliente
@@ -635,7 +643,8 @@ def registrar_deuda():
             
             # Crear datos de deuda
             deuda_data = {
-                'cliente_id': cliente_ref,  # Almacena como referencia
+                'cliente_id': cliente_ref,
+                'cliente_nombre': cliente_data.get('nombre', ''),
                 'cliente_cedula': cliente_data.get('cedula', ''),
                 'fecha': datetime.utcnow(),
                 'estado': 'pendiente'
@@ -650,10 +659,10 @@ def registrar_deuda():
                 producto_ref = db_firestore.collection('productos').document(str(item['producto_id']))
                 
                 producto_deuda_data = {
-                'deuda_id': str(next_id),  # Guardar como string, no como referencia
-                'producto_id': str(item['producto_id']),  # Guardar como string
-                'cantidad': item['cantidad']
-}
+                    'deuda_id': str(next_id),
+                    'producto_id': str(item['producto_id']),
+                    'cantidad': item['cantidad']
+                }
                 
                 db_firestore.collection('productos_deuda').add(producto_deuda_data)
                 
@@ -711,6 +720,7 @@ def registrar_deuda():
                           producto_form=producto_form,
                           productos_deuda=productos_en_deuda,
                           total=total_deuda,
+                          clientes=clientes,  # Asegurar que se pasan los clientes
                           form=EmptyForm())
 
 @app.route('/consultar_deudas')
