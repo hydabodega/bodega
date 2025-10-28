@@ -238,7 +238,7 @@ def login():
                 if bcrypt.check_password_hash(user_data['password'], form.password.data):
                     user = UsuarioFirebase(user_data, user_doc.id)
                     login_user(user)
-                    return redirect(url_for('dashboard'))
+                    return redirect(url_for('index'))
             
             flash('Usuario o contraseña incorrectos', 'danger')
         except Exception as e:
