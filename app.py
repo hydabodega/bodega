@@ -1274,20 +1274,77 @@ def obtener_saldo_pendiente(deuda_id):
         print(f"Error al calcular saldo pendiente: {e}")
         return 0.0
 
-@app.route('/eliminar_deuda/<int:id>', methods=['POST'])
+@app.route('/eliminar_deuda/<string:deuda_id>', methods=['POST'])
 @login_required
-def eliminar_deuda(id):
-    deuda = db.session.get(Deuda, id) or abort(404)
+def eliminar_deuda(deuda_id):
+    try:
+        # Verificar que la deuda existe
+        deuda_ref = db_firestore.collection('deudas').document(deuda_id)
+        deuda_doc = deuda_ref.get()
+        
+        if not deuda_doc.exists:
+            flash('Deuda no encontrada', 'danger')
+            return redirect(url_for('consultar_deudas'))
+        
+        # Obtener productos asociados a la deuda para restaurar stock
+        productos_deuda_query = db_firestore.collection('productos_deuda').where('deuda_id', '==', deuda_id).stream()
+        
+        for prod_doc in productos_deuda_query:
+            prod_data = prod_doc.to_dict()
+            producto_id = prod_data.get('producto_id')
+            cantidad = prod_data.get('cantidad', 0)
+            
+            # Restaurar stock del producto
+            if producto_id:
+                if isinstance(producto_id, DocumentReference):
+                    producto_ref = producto_id
+                elif isinstance(producto_id, str):
+                    producto_ref = db_firestore.collection('productos').document(producto_id)
+                else:
+                    continue
+                
+                producto_ref.update({
+                    'cantidad': firestore.Increment(cantidad)
+                })
+            
+            # Eliminar el registro de producto_deuda
+            prod_doc.reference.delete()
+        
+        # Eliminar pagos parciales asociados
+        pagos_query = db_firestore.collection('pagos_parciales').where('deuda_id', '==', deuda_id).stream()
+        for pago_doc in pagos_query:
+            pago_doc.reference.delete()
+        
+        # Finalmente eliminar la deuda
+        deuda_ref.delete()
+        
+        flash('Deuda eliminada exitosamente', 'success')
+        
+    except Exception as e:
+        print(f"Error al eliminar deuda: {e}")
+        flash('Error al eliminar la deuda', 'danger')
     
-    # Eliminar productos asociados
-    ProductoDeuda.query.filter_by(deuda_id=id).delete()
-    
-    # Eliminar la deuda
-    db.session.delete(deuda)
-    db.session.commit()
-    
-    flash('Deuda eliminada correctamente', 'success')
     return redirect(url_for('consultar_deudas'))
+
+@app.route('/api/producto/<string:producto_id>')
+@login_required
+def api_get_producto(producto_id):
+    try:
+        producto_ref = db_firestore.collection('productos').document(producto_id)
+        producto_doc = producto_ref.get()
+        
+        if producto_doc.exists:
+            producto = producto_doc.to_dict()
+            return jsonify({
+                'id': producto_id,
+                'nombre': producto.get('nombre', ''),
+                'cantidad': producto.get('cantidad', 0),
+                'precio': producto.get('precio', 0)
+            })
+        else:
+            return jsonify({'error': 'Producto no encontrado'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/procesar_pedido/<string:pedido_id>', methods=['POST'])
 @login_required
