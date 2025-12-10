@@ -117,4 +117,11 @@
         </div>
     </div>
 </div>
+<script>
+document.getElementById('btnExportarPDF').addEventListener('click', function() {
+    const filtro = document.getElementById('filtroExportacion').value;
+    window.location.href = `{{ url_for('exportar_deudas_pdf') }}?filtro=${filtro}`;
+});
+</script>
+
 {% endblock %}
