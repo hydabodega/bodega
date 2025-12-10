@@ -2230,18 +2230,19 @@ def ver_pedido(pedido_id):
         items.append(item)
     
     return render_template('detalle_pedido.html', pedido=pedido, items=items)
-
-@app.route('/consultar_deudas')
+    
+@app.route('/exportar_deudas_pdf_filtrado', methods=['GET'])
 @login_required
-def consultar_deudas():
+def exportar_deudas_pdf_filtrado():
     try:
-        estado_filtro = request.args.get('estado', 'todos')
-        cedula_filtro = request.args.get('cedula', '').strip().lower()
+        filtro = request.args.get('filtro', 'todas')
         
         query = db_firestore.collection('deudas')
         
-        if estado_filtro != 'todos':
-            query = query.where(filter=FieldFilter('estado', '==', estado_filtro))
+        if filtro == 'pendientes':
+            query = query.where(filter=FieldFilter('estado', '==', 'pendiente'))
+        elif filtro == 'pagadas':
+            query = query.where(filter=FieldFilter('estado', '==', 'pagada'))
         
         deudas_docs = query.stream()
         
@@ -2310,24 +2311,89 @@ def consultar_deudas():
                 saldo -= monto
 
             deuda['saldo_pendiente'] = saldo
-            
-            # Aplicar filtro de cedula (si se proporcionó)
-            if cedula_filtro and cedula_filtro not in deuda['cliente_cedula'].lower():
-                continue
-                
             deudas.append(deuda)
         
         # Ordenar por fecha descendente
         deudas.sort(key=lambda x: x['fecha'] if x['fecha'] else datetime.min, reverse=True)
         
-        return render_template('consultar_deudas.html', deudas=deudas, 
-                               estado_filtro=estado_filtro, cedula_filtro=cedula_filtro,
-                               form=EmptyForm())
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+        
+        # Encabezado
+        p.setFont("Helvetica-Bold", 16)
+        p.drawString(72, height - 72, "Reporte de Deudas")
+        p.setFont("Helvetica", 10)
+        fecha_reporte = datetime.now().strftime('%d/%m/%Y %H:%M')
+        p.drawString(72, height - 92, f"Generado: {fecha_reporte}")
+        
+        if filtro == 'pendientes':
+            p.drawString(72, height - 112, "Filtro: Solo Deudas Pendientes")
+        elif filtro == 'pagadas':
+            p.drawString(72, height - 112, "Filtro: Solo Deudas Pagadas")
+        else:
+            p.drawString(72, height - 112, "Filtro: Todas las Deudas")
+        
+        # Tabla de deudas
+        data = [['ID', 'Fecha', 'Cliente', 'Cédula', 'Total (USD)', 'Saldo (USD)', 'Estado']]
+        
+        for deuda in deudas:
+            fecha_str = deuda['fecha'].strftime('%d/%m/%Y') if deuda['fecha'] else 'N/A'
+            data.append([
+                str(deuda['id']),
+                fecha_str,
+                deuda['cliente_nombre'][:20],  # Limitar longitud
+                deuda['cliente_cedula'],
+                f"${deuda['total']:.2f}",
+                f"${deuda['saldo_pendiente']:.2f}",
+                deuda['estado'].capitalize()
+            ])
+        
+        # Crear tabla
+        table = Table(data, colWidths=[40, 70, 90, 80, 70, 70, 70])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ]))
+        
+        table.wrapOn(p, width, height)
+        table.drawOn(p, 40, height - 180)
+        
+        # Pie de página
+        p.setFont("Helvetica", 8)
+        p.drawString(72, 30, f"Total de deudas registradas: {len(deudas)}")
+        total_pendiente = sum(d['saldo_pendiente'] for d in deudas)
+        p.drawString(72, 20, f"Total pendiente: ${total_pendiente:.2f}")
+        
+        p.save()
+        
+        buffer.seek(0)
+        
+        filtro_nombre = {
+            'todas': 'todas',
+            'pendientes': 'pendientes',
+            'pagadas': 'pagadas'
+        }.get(filtro, 'todas')
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"reporte_deudas_{filtro_nombre}_{datetime.now().strftime('%d%m%Y')}.pdf",
+            mimetype='application/pdf'
+        )
+    
     except Exception as e:
         import traceback
         traceback.print_exc()
-        flash(f'Error al cargar deudas: {str(e)}', 'danger')
-        return redirect(url_for('dashboard'))
+        flash(f'Error al generar PDF: {str(e)}', 'danger')
+        return redirect(url_for('consultar_deudas'))
 
 if __name__ == '__main__':
     # Configuración para acceso en red local:
