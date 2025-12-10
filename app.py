@@ -1767,7 +1767,6 @@ def descargar_factura(deuda_id):
 # Función auxiliar para exportar todas las deudas a PDF
 # Esta función debe agregarse al archivo app.py después de la función descargar_factura
 
-from flask import Flask, send_file, render_template, redirect, url_for, flash, request, session, abort, jsonify
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib import colors
@@ -1972,8 +1971,6 @@ def exportar_todas_deudas_pdf():
         traceback.print_exc()
         raise e
 
-
-AGREGAR ESTA RUTA AL app.py después de la función descargar_factura:
 @app.route('/exportar_todas_deudas_pdf')
 @login_required
 def exportar_todas_deudas_pdf_route():
