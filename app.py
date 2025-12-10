@@ -2098,6 +2098,180 @@ def ver_pedido(pedido_id):
     
     return render_template('detalle_pedido.html', pedido=pedido, items=items)
 
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+from io import BytesIO
+from datetime import datetime
+
+def exportar_deudas_pdf_filtrado():
+    """
+    Exporta todas las deudas a PDF con opción de filtro por estado.
+    Deudas pendientes en naranja, pagadas en verde, ordenadas por estado.
+    """
+    try:
+        # Obtener parámetro de filtro
+        filtro = request.args.get('filtro', 'todas').lower()  # 'todas', 'pendientes', 'pagadas'
+        
+        # Obtener todas las deudas
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        
+        query = "SELECT * FROM deudas"
+        cursor.execute(query)
+        deudas = cursor.fetchall()
+        
+        # Filtrar deudas según el parámetro
+        if filtro == 'pendientes':
+            deudas = [d for d in deudas if d.get('saldo_pendiente', 0) > 0]
+        elif filtro == 'pagadas':
+            deudas = [d for d in deudas if d.get('saldo_pendiente', 0) <= 0]
+        
+        # Ordenar: pendientes primero, luego pagadas
+        deudas_pendientes = [d for d in deudas if d.get('saldo_pendiente', 0) > 0]
+        deudas_pagadas = [d for d in deudas if d.get('saldo_pendiente', 0) <= 0]
+        deudas_ordenadas = deudas_pendientes + deudas_pagadas
+        
+        # Crear PDF con Platypus
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, 
+            pagesize=letter,
+            rightMargin=30,
+            leftMargin=30,
+            topMargin=40,
+            bottomMargin=30,
+            title="Reporte de Deudas"
+        )
+        
+        # Estilos
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            textColor=colors.HexColor('#1a1a1a'),
+            spaceAfter=6,
+            alignment=TA_CENTER,
+            fontName='Helvetica-Bold'
+        )
+        
+        normal_style = ParagraphStyle(
+            'Normal',
+            fontSize=9,
+            alignment=TA_CENTER,
+            valign='MIDDLE'
+        )
+        
+        # Contenido del documento
+        story = []
+        
+        # Título y fecha
+        fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M')
+        story.append(Paragraph("REPORTE DE DEUDAS", title_style))
+        story.append(Paragraph(f"Generado: {fecha_actual}", styles['Normal']))
+        story.append(Paragraph(f"Filtro: {filtro.upper()}", styles['Normal']))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Construir tabla de deudas
+        data = [['ID', 'Cliente', 'Cédula', 'Fecha', 'Monto', 'Saldo', 'Estado']]
+        
+        for deuda in deudas_ordenadas:
+            estado_pago = 'PAGADA' if deuda.get('saldo_pendiente', 0) <= 0 else 'PENDIENTE'
+            
+            data.append([
+                str(deuda.get('id_deuda', '')),
+                str(deuda.get('nombre_cliente', '')),
+                str(deuda.get('cedula_cliente', '')),
+                deuda.get('fecha', '').strftime('%d/%m/%Y') if hasattr(deuda.get('fecha'), 'strftime') else str(deuda.get('fecha', '')),
+                f"${deuda.get('monto_total', 0):.2f}",
+                f"${deuda.get('saldo_pendiente', 0):.2f}",
+                estado_pago
+            ])
+        
+        # Crear tabla con estilos
+        table = Table(data, colWidths=[0.6*inch, 1.5*inch, 1*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.8*inch])
+        
+        table_style = [
+            # Encabezado
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+            ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('ROWPADDING', (0, 1), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]
+        
+        # Colorear filas según estado (pendiente = naranja, pagada = verde)
+        row_num = 1
+        for deuda in deudas_ordenadas:
+            is_pendiente = deuda.get('saldo_pendiente', 0) > 0
+            
+            if is_pendiente:
+                # Naranja claro para pendientes
+                background_color = colors.HexColor('#FFE0B2')
+                text_color = colors.HexColor('#E65100')
+            else:
+                # Verde claro para pagadas
+                background_color = colors.HexColor('#C8E6C9')
+                text_color = colors.HexColor('#2E7D32')
+            
+            table_style.append(
+                ('BACKGROUND', (0, row_num), (-1, row_num), background_color)
+            )
+            table_style.append(
+                ('TEXTCOLOR', (0, row_num), (-1, row_num), text_color)
+            )
+            table_style.append(
+                ('FONTNAME', (0, row_num), (-1, row_num), 'Helvetica-Bold')
+            )
+            row_num += 1
+        
+        table.setStyle(TableStyle(table_style))
+        story.append(table)
+        
+        # Resumen
+        story.append(Spacer(1, 0.3*inch))
+        total_deudas = len(deudas_ordenadas)
+        total_monto = sum(d.get('monto_total', 0) for d in deudas_ordenadas)
+        total_saldo = sum(d.get('saldo_pendiente', 0) for d in deudas_ordenadas)
+        
+        resumen = f"""
+        <b>RESUMEN:</b><br/>
+        Total de deudas: {total_deudas}<br/>
+        Monto total: ${total_monto:.2f}<br/>
+        Saldo pendiente: ${total_saldo:.2f}
+        """
+        story.append(Paragraph(resumen, styles['Normal']))
+        
+        # Generar PDF
+        doc.build(story)
+        buffer.seek(0)
+        
+        # Nombre del archivo
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"deudas_{filtro}_{timestamp}.pdf"
+        
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+    
+    except Exception as e:
+        return {"error": f"Error al generar PDF: {str(e)}"}, 500
+
+
 if __name__ == '__main__':
     # Configuración para acceso en red local:
     app.run(
