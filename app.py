@@ -817,15 +817,19 @@ def registrar_deuda():
 @login_required
 def consultar_deudas():
     try:
+        # Obtener parámetros de filtro
         estado_filtro = request.args.get('estado', 'todos')
         cedula_filtro = request.args.get('cedula', '').strip().lower()
         
-        query = db_firestore.collection('deudas')
+        # Construir consulta base
+        deudas_ref = db_firestore.collection('deudas')
         
+        # Aplicar filtro de estado si no es 'todos'
         if estado_filtro != 'todos':
-            query = query.where(filter=FieldFilter('estado', '==', estado_filtro))
+            deudas_ref = deudas_ref.where(filter=FieldFilter('estado', '==', estado_filtro))
         
-        deudas_docs = query.stream()
+        # Ejecutar consulta inicial
+        deudas_docs = deudas_ref.stream()
         
         deudas = []
         for deuda_doc in deudas_docs:
@@ -858,7 +862,7 @@ def consultar_deudas():
             # Calcular total de la deuda
             total = 0.0
             productos_query = db_firestore.collection('productos_deuda')\
-                .where(filter=FieldFilter('deuda_id', '==', deuda_doc.id)).stream()
+                .where('deuda_id', '==', deuda_doc.id).stream()
             
             for prod_doc in productos_query:
                 prod_data = prod_doc.to_dict()
@@ -884,7 +888,7 @@ def consultar_deudas():
             # Calcular saldo pendiente
             saldo = total
             pagos_query = db_firestore.collection('pagos_parciales')\
-                .where(filter=FieldFilter('deuda_id', '==', deuda_doc.id)).stream()
+                .where('deuda_id', '==', deuda_doc.id).stream()
             
             for pago_doc in pagos_query:
                 pago_data = pago_doc.to_dict()
@@ -904,13 +908,12 @@ def consultar_deudas():
         
         return render_template('consultar_deudas.html', deudas=deudas, 
                                estado_filtro=estado_filtro, cedula_filtro=cedula_filtro,
-                               form=EmptyForm())
+                          form=EmptyForm())
     except Exception as e:
         import traceback
         traceback.print_exc()
         flash(f'Error al cargar deudas: {str(e)}', 'danger')
-        return redirect(url_for('index'))
-
+        return redirect(url_for('dashboard'))
 
 @app.route('/eliminar_producto_temp/<int:index>', methods=['POST'])
 @login_required
@@ -1761,6 +1764,44 @@ def descargar_factura(deuda_id):
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name=f"factura_{deuda_id}.pdf", mimetype='application/pdf')
 
+@app.route('/mi_cuenta', methods=['GET', 'POST'])
+@login_required
+def mi_cuenta():
+    # Obtener información existente de la empresa
+    empresa_ref = db_firestore.collection('empresa').document('info')
+    empresa_doc = empresa_ref.get()
+    empresa_data = empresa_doc.to_dict() if empresa_doc.exists else None
+    
+    form = EmpresaForm()
+    
+    # Cargar datos existentes en el formulario
+    if request.method == 'GET' and empresa_data:
+        form.nombre.data = empresa_data.get('nombre', '')
+        form.direccion.data = empresa_data.get('direccion', '')
+        form.telefono.data = empresa_data.get('telefono', '')
+        form.facebook.data = empresa_data.get('facebook', '')
+        form.instagram.data = empresa_data.get('instagram', '')
+        form.twitter.data = empresa_data.get('twitter', '')
+        form.logo_url.data = empresa_data.get('logo_url', '')
+    
+    if form.validate_on_submit():
+        # Guardar/actualizar información
+        empresa_data = {
+            'nombre': form.nombre.data,
+            'direccion': form.direccion.data,
+            'telefono': form.telefono.data,
+            'facebook': form.facebook.data,
+            'instagram': form.instagram.data,
+            'twitter': form.twitter.data,
+            'logo_url': form.logo_url.data
+        }
+        
+        empresa_ref.set(empresa_data)
+        flash('Información de la empresa actualizada correctamente', 'success')
+        return redirect(url_for('mi_cuenta'))
+    
+    return render_template('mi_cuenta.html', form=form, empresa=empresa_data)
+
 # Función para inyectar datos de la empresa en todas las plantillas
 @app.context_processor
 def inject_empresa():
@@ -1775,7 +1816,7 @@ def inject_empresa():
 def tienda():
     # Obtener productos con stock
     productos = []
-    query = db_firestore.collection('productos').where(filter=FieldFilter('cantidad', '>', 0))
+    query = db_firestore.collection('productos').where('cantidad', '>', 0)
     
     for doc in query.stream():
         producto = doc.to_dict()
@@ -2056,7 +2097,6 @@ def ver_pedido(pedido_id):
         items.append(item)
     
     return render_template('detalle_pedido.html', pedido=pedido, items=items)
-    
 
 if __name__ == '__main__':
     # Configuración para acceso en red local:
