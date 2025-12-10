@@ -2231,6 +2231,104 @@ def ver_pedido(pedido_id):
     
     return render_template('detalle_pedido.html', pedido=pedido, items=items)
 
+@app.route('/consultar_deudas')
+@login_required
+def consultar_deudas():
+    try:
+        estado_filtro = request.args.get('estado', 'todos')
+        cedula_filtro = request.args.get('cedula', '').strip().lower()
+        
+        query = db_firestore.collection('deudas')
+        
+        if estado_filtro != 'todos':
+            query = query.where(filter=FieldFilter('estado', '==', estado_filtro))
+        
+        deudas_docs = query.stream()
+        
+        deudas = []
+        for deuda_doc in deudas_docs:
+            deuda_data = deuda_doc.to_dict()
+            deuda = {
+                'id': deuda_doc.id,
+                'estado': deuda_data.get('estado', 'pendiente'),
+                'fecha': deuda_data.get('fecha', None),
+                'cliente_cedula': deuda_data.get('cliente_cedula', '')
+            }
+            
+            # Obtener referencia al cliente
+            cliente_ref = deuda_data.get('cliente_id')
+            cliente_id = None
+            if isinstance(cliente_ref, DocumentReference):
+                cliente_id = cliente_ref.id
+            elif isinstance(cliente_ref, str):
+                cliente_id = cliente_ref
+            else:
+                continue
+                
+            # Obtener nombre del cliente
+            cliente_doc = db_firestore.collection('clientes').document(cliente_id).get()
+            if cliente_doc.exists:
+                deuda['cliente_nombre'] = cliente_doc.to_dict().get('nombre', '')
+            else:
+                deuda['cliente_nombre'] = 'Cliente eliminado'
+            deuda['cliente_id'] = cliente_id
+
+            # Calcular total de la deuda
+            total = 0.0
+            productos_query = db_firestore.collection('productos_deuda')\
+                .where(filter=FieldFilter('deuda_id', '==', deuda_doc.id)).stream()
+            
+            for prod_doc in productos_query:
+                prod_data = prod_doc.to_dict()
+                producto_id = prod_data.get('producto_id', '')
+                cantidad = prod_data.get('cantidad', 0)
+                
+                if producto_id:
+                    if isinstance(producto_id, DocumentReference):
+                        producto_ref = producto_id
+                    elif isinstance(producto_id, str):
+                        producto_ref = db_firestore.collection('productos').document(producto_id)
+                    else:
+                        continue
+                    
+                    producto_doc = producto_ref.get()
+                    if producto_doc.exists:
+                        producto = producto_doc.to_dict()
+                        precio = producto.get('precio', 0.0)
+                        total += precio * cantidad
+
+            deuda['total'] = total
+            
+            # Calcular saldo pendiente
+            saldo = total
+            pagos_query = db_firestore.collection('pagos_parciales')\
+                .where(filter=FieldFilter('deuda_id', '==', deuda_doc.id)).stream()
+            
+            for pago_doc in pagos_query:
+                pago_data = pago_doc.to_dict()
+                monto = pago_data.get('monto_usd', 0.0)
+                saldo -= monto
+
+            deuda['saldo_pendiente'] = saldo
+            
+            # Aplicar filtro de cedula (si se proporcionó)
+            if cedula_filtro and cedula_filtro not in deuda['cliente_cedula'].lower():
+                continue
+                
+            deudas.append(deuda)
+        
+        # Ordenar por fecha descendente
+        deudas.sort(key=lambda x: x['fecha'] if x['fecha'] else datetime.min, reverse=True)
+        
+        return render_template('consultar_deudas.html', deudas=deudas, 
+                               estado_filtro=estado_filtro, cedula_filtro=cedula_filtro,
+                               form=EmptyForm())
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        flash(f'Error al cargar deudas: {str(e)}', 'danger')
+        return redirect(url_for('dashboard'))
+
 if __name__ == '__main__':
     # Configuración para acceso en red local:
     app.run(
