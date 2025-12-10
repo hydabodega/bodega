@@ -2271,6 +2271,14 @@ def exportar_deudas_pdf_filtrado():
     except Exception as e:
         return {"error": f"Error al generar PDF: {str(e)}"}, 500
 
+@app.route('/exportar_deudas_pdf_filtrado', methods=['GET'])
+@login_required
+def exportar_deudas_pdf_filtrado_route():
+    """
+    Ruta para exportar deudas a PDF con filtro por estado.
+    Parámetro: filtro=todas|pendientes|pagadas
+    """
+    return exportar_deudas_pdf_filtrado()
 
 if __name__ == '__main__':
     # Configuración para acceso en red local:
