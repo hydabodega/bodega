@@ -7,20 +7,9 @@
             <h2 class="mb-0">Gestión de Deudas</h2>
             <p class="text-muted mb-0">Consulta y gestiona todas las deudas de tus clientes</p>
         </div>
-        <button onclick="abrirModalFiltro()" style="
-            padding: 10px 20px;
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        ">
-            📄 Exportar a PDF
+        <!-- Botón para abrir el modal (agregar en la sección de filtros) -->
+        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalExportarPDF">
+          <i class="fa fa-file-pdf"></i> Exportar a PDF
         </button>
     </div>
 
@@ -122,91 +111,37 @@
     </div>
 </div>
 
-<div id="filtroExportModal" class="modal">
+<!-- Modal para seleccionar filtro de exportación -->
+<div id="modalExportarPDF" class="modal fade" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-        <span class="close" onclick="cerrarModalFiltro()">&times;</span>
-        <h2>Exportar Deudas a PDF</h2>
-        
-        <form id="formExportarPDF" method="GET" action="/exportar_deudas_pdf_filtrado">
-            <div class="form-group">
-                <label for="filtroExport">Selecciona el tipo de deudas a exportar:</label>
-                <select id="filtroExport" name="filtro" required style="padding: 10px; font-size: 14px; border-radius: 4px; border: 1px solid #ddd;">
-                    <option value="todas">Todas las deudas</option>
-                    <option value="pendientes">Solo pendientes</option>
-                    <option value="pagadas">Solo pagadas</option>
-                </select>
-            </div>
-            
-            <div style="margin-top: 20px; text-align: right;">
-                <button type="button" onclick="cerrarModalFiltro()" style="padding: 10px 20px; margin-right: 10px; background: #ccc; border: none; border-radius: 4px; cursor: pointer;">Cancelar</button>
-                <button type="submit" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">Descargar PDF</button>
-            </div>
+      <div class="modal-header">
+        <h5 class="modal-title">Exportar Deudas a PDF</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formExportarPDF" method="POST" action="{{ url_for('exportar_deudas_pdf') }}">
+          <div class="mb-3">
+            <label for="filtroEstado" class="form-label">Selecciona qué deudas exportar:</label>
+            <select class="form-select" id="filtroEstado" name="filtro_estado" required>
+              <option value="todas">Todas las deudas</option>
+              <option value="pendientes">Solo deudas pendientes</option>
+              <option value="pagadas">Solo deudas pagadas</option>
+            </select>
+          </div>
         </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('formExportarPDF').submit()">
+          <i class="fa fa-file-pdf"></i> Descargar PDF
+        </button>
+      </div>
     </div>
+  </div>
 </div>
 
 <script>
-function abrirModalFiltro() {
-    document.getElementById('filtroExportModal').style.display = 'block';
-}
-
-function cerrarModalFiltro() {
-    document.getElementById('filtroExportModal').style.display = 'none';
-}
-
-// Cerrar modal al hacer clic fuera
-window.onclick = function(event) {
-    const modal = document.getElementById('filtroExportModal');
-    if (event.target == modal) {
-        modal.style.display = 'none';
-    }
-}
+// El modal se abre automáticamente cuando se hace clic en el botón
 </script>
-
-<style>
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.4);
-}
-
-.modal-content {
-    background-color: #fefefe;
-    margin: 15% auto;
-    padding: 20px;
-    border: 1px solid #888;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 400px;
-}
-
-.close {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.close:hover {
-    color: black;
-}
-
-.form-group {
-    margin: 15px 0;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: bold;
-}
-</style>
-
-
 {% endblock %}
