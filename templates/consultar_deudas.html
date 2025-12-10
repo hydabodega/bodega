@@ -4,108 +4,116 @@
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-0">Consulta de Deudas</h2>
-            <p class="text-muted mb-0">Administra las deudas registradas en el sistema</p>
+            <h2 class="mb-0">Gestión de Deudas</h2>
+            <p class="text-muted mb-0">Consulta y gestiona todas las deudas de tus clientes</p>
         </div>
-        <div class="d-flex gap-2">
-            <a href="{{ url_for('exportar_todas_deudas_pdf_route') }}" class="btn btn-success" title="Exportar todas las deudas">
-                <i class="bi bi-file-earmark-pdf me-2"></i> Exportar Todo a PDF
-            </a>
+        <div class="btn-group">
+            <!-- Agregar selector de filtro para exportación a PDF -->
+            <select id="filtroExportacion" class="form-select form-select-sm" style="width: auto;">
+                <option value="todas">Exportar: Todas</option>
+                <option value="pendiente">Exportar: Pendientes</option>
+                <option value="pagada">Exportar: Pagadas</option>
+            </select>
+            <button class="btn btn-primary btn-sm ms-2" id="btnExportarPDF">
+                <i class="bi bi-file-earmark-pdf"></i> Exportar a PDF
+            </button>
         </div>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-2"></i> Volver
-        </a>
     </div>
 
+    <!-- Filtros de búsqueda -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
-            <form method="GET" class="row g-3">
-                <div class="col-md-3">
-                    <label for="estado" class="form-label">Estado</label>
-                    <select class="form-select" name="estado" id="estado">
-                        <option value="todos" {% if estado_filtro == 'todos' %}selected{% endif %}>Todos</option>
-                        <option value="pendiente" {% if estado_filtro == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                        <option value="pagada" {% if estado_filtro == 'pagada' %}selected{% endif %}>Pagada</option>
+            <form method="GET" action="{{ url_for('consultar_deudas') }}" class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Filtrar por Estado</label>
+                    <select name="estado" class="form-select">
+                        <option value="todos" {% if estado_filtro == 'todos' %}selected{% endif %}>Todas</option>
+                        <option value="pendiente" {% if estado_filtro == 'pendiente' %}selected{% endif %}>Pendientes</option>
+                        <option value="pagada" {% if estado_filtro == 'pagada' %}selected{% endif %}>Pagadas</option>
                     </select>
                 </div>
-                <div class="col-md-5">
-                    <label for="cedula" class="form-label">Cedula del Cliente</label>
-                    <input type="text" class="form-control" name="cedula" id="cedula" value="{{ cedula_filtro }}">
+                <div class="col-md-6">
+                    <label class="form-label">Filtrar por Cédula</label>
+                    <input type="text" name="cedula" class="form-control" placeholder="Ej: 12345678" 
+                           value="{{ cedula_filtro }}">
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary me-2">Filtrar</button>
-                    <a href="{{ url_for('consultar_deudas') }}" class="btn btn-outline-secondary">Limpiar</a>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-funnel"></i> Filtrar
+                    </button>
+                    <a href="{{ url_for('consultar_deudas') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i> Limpiar
+                    </a>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Tabla de deudas -->
     <div class="card border-0 shadow-sm">
         <div class="card-body">
+            {% if deudas %}
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
+                <table class="table table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th>
-                            <th>Fecha</th>
+                            <th>ID Deuda</th>
                             <th>Cliente</th>
-                            <th>Cedula</th>
-                            <th>Total (USD)</th>
-                            <th>Saldo (USD)</th>
+                            <th>Cédula</th>
+                            <th>Fecha</th>
                             <th>Estado</th>
-                            <th class="text-end">Acciones</th>
+                            <th>Total</th>
+                            <th>Saldo Pendiente</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for deuda in deudas %}
-                            <tr>
-                                <td>{{ deuda.id }}</td>
-                                <td>
-                                    {% if deuda.fecha %}
-                                        {{ deuda.fecha.strftime('%d/%m/%Y') }}
-                                    {% else %}
-                                        N/A
-                                    {% endif %}
-                                </td>
-                                <td>{{ deuda.cliente_nombre }}</td>
-                                <td>{{ deuda.cliente_cedula }}</td>
-                                <td>{{ deuda.total|round(2) }}</td>
-                                <td>{{ deuda.saldo_pendiente|round(2) }}</td>
-                                <td>
-                                    <span class="badge bg-{{ 'success' if deuda.estado == 'pagada' else 'warning' }}">
-                                        {{ deuda.estado|capitalize }}
-                                    </span>
-                                </td>
-                                <td class="text-end">
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{{ url_for('gestion_deudas', cliente_id=deuda.cliente_id) }}" 
-                                           class="btn btn-outline-info" title="Gestionar Pagos">
-                                            <i class="bi bi-cash-coin"></i>
-                                        </a>
-                                        <!-- Botón para eliminar deuda -->
-                                        <form method="POST" action="{{ url_for('eliminar_deuda', deuda_id=deuda.id) }}" 
-                                              class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas eliminar esta deuda? Esta acción no se puede deshacer.');">
-                                            <button type="submit" class="btn btn-outline-danger" title="Eliminar Deuda">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td colspan="8" class="text-center py-4">
-                                    <div class="py-4">
-                                        <i class="bi bi-receipt display-6 text-muted mb-3"></i>
-                                        <p>No hay deudas registradas con los filtros aplicados</p>
-                                    </div>
-                                </td>
-                            </tr>
+                        <!-- Ordenar deudas: pendientes primero (naranja), luego pagadas (verde) -->
+                        <tr class="{% if deuda.estado == 'pendiente' %}table-warning{% else %}table-success{% endif %}">
+                            <td><strong>#{{ deuda.id[:8] }}</strong></td>
+                            <td>{{ deuda.cliente_nombre }}</td>
+                            <td>{{ deuda.cliente_cedula }}</td>
+                            <td>{{ deuda.fecha.strftime('%d/%m/%Y') if deuda.fecha else 'N/A' }}</td>
+                            <td>
+                                {% if deuda.estado == 'pendiente' %}
+                                    <span class="badge bg-warning text-dark">Pendiente</span>
+                                {% else %}
+                                    <span class="badge bg-success">Pagada</span>
+                                {% endif %}
+                            </td>
+                            <td>${{ deuda.total|round(2) }}</td>
+                            <td>
+                                {% if deuda.saldo_pendiente > 0 %}
+                                    <span class="text-danger fw-bold">${{ deuda.saldo_pendiente|round(2) }}</span>
+                                {% else %}
+                                    <span class="text-success">$0.00</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('ver_deuda_cliente', cliente_id=deuda.cliente_id) }}" 
+                                   class="btn btn-sm btn-info">
+                                    <i class="bi bi-eye"></i> Ver
+                                </a>
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i> No hay deudas registradas con los filtros seleccionados.
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('btnExportarPDF').addEventListener('click', function() {
+    const filtro = document.getElementById('filtroExportacion').value;
+    window.location.href = `{{ url_for('exportar_deudas_pdf') }}?filtro=${filtro}`;
+});
+</script>
 {% endblock %}
