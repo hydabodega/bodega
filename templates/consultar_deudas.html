@@ -12,7 +12,7 @@
         </a>
     </div>
 
-    <div class="card border-0 shadow-sm mb-4">
+        <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
@@ -72,10 +72,19 @@
                                     </span>
                                 </td>
                                 <td class="text-end">
-                                    <a href="{{ url_for('gestion_deudas', cliente_id=deuda.cliente_id) }}" 
-                                    class="btn btn-sm btn-outline-info" title="Gestionar Pagos">
-                                        <i class="bi bi-cash-coin"></i>
-                                    </a>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('gestion_deudas', cliente_id=deuda.cliente_id) }}" 
+                                           class="btn btn-outline-info" title="Gestionar Pagos">
+                                            <i class="bi bi-cash-coin"></i>
+                                        </a>
+                                        <!-- Botón para eliminar deuda -->
+                                        <form method="POST" action="{{ url_for('eliminar_deuda', deuda_id=deuda.id) }}" 
+                                              class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas eliminar esta deuda? Esta acción no se puede deshacer.');">
+                                            <button type="submit" class="btn btn-outline-danger" title="Eliminar Deuda">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         {% else %}
