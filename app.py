@@ -1764,6 +1764,232 @@ def descargar_factura(deuda_id):
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name=f"factura_{deuda_id}.pdf", mimetype='application/pdf')
 
+# Función auxiliar para exportar todas las deudas a PDF
+# Esta función debe agregarse al archivo app.py después de la función descargar_factura
+
+from flask import Flask, send_file, render_template, redirect, url_for, flash, request, session, abort, jsonify
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle, PageBreak, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from io import BytesIO
+from datetime import datetime
+from google.cloud.firestore_v1 import DocumentReference
+
+def exportar_todas_deudas_pdf():
+    """
+    Genera un PDF con todas las deudas de todos los clientes con su detalle completo
+    """
+    try:
+        # Obtener todas las deudas
+        deudas_ref = db_firestore.collection('deudas')
+        deudas_docs = deudas_ref.stream()
+        
+        # Crear buffer para el PDF
+        buffer = BytesIO()
+        styles = getSampleStyleSheet()
+        
+        # Crear título personalizado
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=20,
+            textColor=colors.HexColor('#1f2937'),
+            spaceAfter=30,
+            alignment=1  # Centro
+        )
+        
+        # Crear estilos para encabezados
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor('#111827'),
+            spaceAfter=12,
+            spaceBefore=12,
+            borderBottom=1,
+            borderColor=colors.HexColor('#e5e7eb')
+        )
+        
+        # Usar reportlab canvas para crear el PDF
+        p = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+        y_position = height - 50
+        
+        # Encabezado principal
+        p.setFont("Helvetica-Bold", 18)
+        p.drawString(50, y_position, "REPORTE DE TODAS LAS DEUDAS")
+        y_position -= 25
+        
+        p.setFont("Helvetica", 10)
+        fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+        p.drawString(50, y_position, f"Generado: {fecha_actual}")
+        y_position -= 40
+        
+        # Obtener información de la empresa
+        empresa_ref = db_firestore.collection('empresa').document('info')
+        empresa_doc = empresa_ref.get()
+        empresa = empresa_doc.to_dict() if empresa_doc.exists else {}
+        
+        if empresa.get('nombre'):
+            p.setFont("Helvetica-Bold", 12)
+            p.drawString(50, y_position, empresa.get('nombre', ''))
+            y_position -= 15
+            p.setFont("Helvetica", 10)
+            p.drawString(50, y_position, f"Teléfono: {empresa.get('telefono', '')}")
+            y_position -= 30
+        
+        # Procesar cada deuda
+        deuda_contador = 0
+        for deuda_doc in deudas_docs:
+            deuda_contador += 1
+            deuda_data = deuda_doc.to_dict()
+            
+            # Obtener información del cliente
+            cliente_ref = deuda_data.get('cliente_id')
+            cliente_id = None
+            if isinstance(cliente_ref, DocumentReference):
+                cliente_id = cliente_ref.id
+            elif isinstance(cliente_ref, str):
+                cliente_id = cliente_ref
+            else:
+                continue
+            
+            cliente_doc = db_firestore.collection('clientes').document(cliente_id).get()
+            cliente = cliente_doc.to_dict() if cliente_doc.exists else {}
+            
+            # Salto de página si es necesario
+            if y_position < 200:
+                p.showPage()
+                y_position = height - 50
+            
+            # Encabezado de deuda
+            p.setFont("Helvetica-Bold", 11)
+            p.drawString(50, y_position, f"Deuda #{deuda_doc.id} - {deuda_data.get('fecha', datetime.now()).strftime('%d/%m/%Y')}")
+            y_position -= 18
+            
+            # Información del cliente
+            p.setFont("Helvetica", 9)
+            p.drawString(60, y_position, f"Cliente: {cliente.get('nombre', 'N/A')}")
+            y_position -= 12
+            p.drawString(60, y_position, f"Cédula: {cliente.get('cedula', 'N/A')}")
+            y_position -= 12
+            p.drawString(60, y_position, f"Dirección: {cliente.get('cliente_direccion', 'N/A')}")
+            y_position -= 12
+            p.drawString(60, y_position, f"Teléfono: {cliente.get('cliente_telefono', 'N/A')}")
+            y_position -= 12
+            p.drawString(60, y_position, f"Estado: {deuda_data.get('estado', 'pendiente').upper()}")
+            y_position -= 20
+            
+            # Tabla de productos
+            productos = []
+            productos_query = db_firestore.collection('productos_deuda').where('deuda_id', '==', deuda_doc.id).stream()
+            
+            subtotal = 0
+            for prod_doc in productos_query:
+                prod_data = prod_doc.to_dict()
+                producto_id = prod_data.get('producto_id', '')
+                cantidad = prod_data.get('cantidad', 0)
+                
+                if producto_id:
+                    if isinstance(producto_id, DocumentReference):
+                        producto_ref = producto_id
+                    elif isinstance(producto_id, str):
+                        producto_ref = db_firestore.collection('productos').document(producto_id)
+                    else:
+                        continue
+                    
+                    producto_doc = producto_ref.get()
+                    if producto_doc.exists:
+                        producto = producto_doc.to_dict()
+                        precio_sin_iva = producto.get('precio', 0) * 100 / 116
+                        subtotal_sin_iva = precio_sin_iva * cantidad
+                        subtotal += subtotal_sin_iva
+                        
+                        productos.append([
+                            producto.get('nombre', ''),
+                            str(cantidad),
+                            f"${precio_sin_iva:.2f}",
+                            f"${subtotal_sin_iva:.2f}"
+                        ])
+            
+            # Crear tabla con productos
+            if productos:
+                table_data = [["Producto", "Cantidad", "Precio (sin IVA)", "Subtotal (sin IVA)"]]
+                table_data.extend(productos)
+                
+                # Calcular totales
+                iva = subtotal * 0.16
+                total = subtotal + iva
+                
+                table_data.append(["", "", "Sub Total:", f"${subtotal:.2f}"])
+                table_data.append(["", "", "IVA (16%):", f"${iva:.2f}"])
+                table_data.append(["", "", "TOTAL:", f"${total:.2f}"])
+                
+                # Calcular saldo pendiente
+                saldo = total
+                pagos_query = db_firestore.collection('pagos_parciales').where('deuda_id', '==', deuda_doc.id).stream()
+                
+                for pago_doc in pagos_query:
+                    pago_data = pago_doc.to_dict()
+                    saldo -= pago_data.get('monto_usd', 0)
+                
+                table_data.append(["", "", "Saldo Pendiente:", f"${saldo:.2f}"])
+                
+                # Crear tabla
+                table = Table(table_data, colWidths=[200, 70, 100, 100])
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#374151')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                    ('BACKGROUND', (0, 1), (-1, -4), colors.HexColor('#f9fafb')),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -4), [colors.white, colors.HexColor('#f3f4f6')]),
+                    ('FONTNAME', (0, -3), (-1, -1), 'Helvetica-Bold'),
+                    ('BACKGROUND', (0, -3), (-1, -1), colors.HexColor('#e5e7eb')),
+                    ('FONTSIZE', (0, -3), (-1, -1), 9),
+                ]))
+                
+                # Dibujar tabla
+                table.wrapOn(p, width - 100, 0)
+                table.drawOn(p, 50, y_position - len(productos) * 20 - 100)
+                
+                y_position -= (len(productos) * 20 + 120)
+            
+            y_position -= 20
+        
+        p.save()
+        buffer.seek(0)
+        
+        return buffer
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise e
+
+
+AGREGAR ESTA RUTA AL app.py después de la función descargar_factura:
+@app.route('/exportar_todas_deudas_pdf')
+@login_required
+def exportar_todas_deudas_pdf_route():
+     try:
+         buffer = exportar_todas_deudas_pdf()
+         return send_file(
+             buffer,
+             as_attachment=True,
+             download_name=f"deudas_completo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+             mimetype='application/pdf'
+         )
+     except Exception as e:
+         flash(f'Error al exportar deudas: {str(e)}', 'danger')
+         return redirect(url_for('consultar_deudas'))
+
+
 @app.route('/mi_cuenta', methods=['GET', 'POST'])
 @login_required
 def mi_cuenta():
