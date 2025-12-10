@@ -14,6 +14,21 @@
                 <option value="pendiente">Exportar: Pendientes</option>
                 <option value="pagada">Exportar: Pagadas</option>
             </select>
+            <button onclick="abrirModalFiltro()" style="
+                padding: 10px 20px;
+                background-color: #e74c3c;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                margin-bottom: 15px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                ">
+                📄 Exportar Todo a PDF
+            </button>
         </div>
     </div>
 
@@ -114,4 +129,92 @@
         </div>
     </div>
 </div>
+
+<div id="filtroExportModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="cerrarModalFiltro()">&times;</span>
+        <h2>Exportar Deudas a PDF</h2>
+        
+        <form id="formExportarPDF" method="GET" action="/exportar_deudas_pdf_filtrado">
+            <div class="form-group">
+                <label for="filtroExport">Selecciona el tipo de deudas a exportar:</label>
+                <select id="filtroExport" name="filtro" required style="padding: 10px; font-size: 14px; border-radius: 4px; border: 1px solid #ddd;">
+                    <option value="todas">Todas las deudas</option>
+                    <option value="pendientes">Solo pendientes</option>
+                    <option value="pagadas">Solo pagadas</option>
+                </select>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="button" onclick="cerrarModalFiltro()" style="padding: 10px 20px; margin-right: 10px; background: #ccc; border: none; border-radius: 4px; cursor: pointer;">Cancelar</button>
+                <button type="submit" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">Descargar PDF</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirModalFiltro() {
+    document.getElementById('filtroExportModal').style.display = 'block';
+}
+
+function cerrarModalFiltro() {
+    document.getElementById('filtroExportModal').style.display = 'none';
+}
+
+// Cerrar modal al hacer clic fuera
+window.onclick = function(event) {
+    const modal = document.getElementById('filtroExportModal');
+    if (event.target == modal) {
+        modal.style.display = 'none';
+    }
+}
+</script>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 400px;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: black;
+}
+
+.form-group {
+    margin: 15px 0;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+</style>
+
+
 {% endblock %}
