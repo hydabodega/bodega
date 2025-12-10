@@ -1971,6 +1971,225 @@ def exportar_todas_deudas_pdf():
         traceback.print_exc()
         raise e
 
+@app.route('/exportar_deudas_pdf')
+@login_required
+def exportar_deudas_pdf():
+    """Exportar deudas a PDF con opciones de filtro"""
+    try:
+        # Obtener parámetro de filtro
+        filtro_estado = request.args.get('filtro', 'todas')  # todas, pendientes, pagadas
+        
+        # Obtener todas las deudas
+        deudas_ref = db_firestore.collection('deudas')
+        if filtro_estado in ['pendiente', 'pagada']:
+            deudas_ref = deudas_ref.where(filter=FieldFilter('estado', '==', filtro_estado))
+        
+        deudas_docs = deudas_ref.stream()
+        
+        deudas_lista = []
+        for deuda_doc in deudas_docs:
+            deuda_data = deuda_doc.to_dict()
+            
+            # Obtener cliente
+            cliente_ref = deuda_data.get('cliente_id')
+            cliente_id = None
+            if isinstance(cliente_ref, DocumentReference):
+                cliente_id = cliente_ref.id
+            elif isinstance(cliente_ref, str):
+                cliente_id = cliente_ref
+            else:
+                continue
+            
+            cliente_doc = db_firestore.collection('clientes').document(cliente_id).get()
+            cliente = cliente_doc.to_dict() if cliente_doc.exists else {}
+            
+            # Obtener productos
+            productos = []
+            productos_query = db_firestore.collection('productos_deuda')\
+                .where('deuda_id', '==', deuda_doc.id).stream()
+            
+            subtotal = 0
+            for prod_doc in productos_query:
+                prod_data = prod_doc.to_dict()
+                producto_id = prod_data['producto_id']
+                
+                if isinstance(producto_id, DocumentReference):
+                    producto_ref = producto_id
+                elif isinstance(producto_id, str):
+                    producto_ref = db_firestore.collection('productos').document(producto_id)
+                else:
+                    continue
+                
+                producto_doc = producto_ref.get()
+                if producto_doc.exists:
+                    producto = producto_doc.to_dict()
+                    precio_sin_iva = calcular_precio_sin_iva(producto['precio'])
+                    cantidad = prod_data['cantidad']
+                    prod_subtotal = precio_sin_iva * cantidad
+                    subtotal += prod_subtotal
+                    
+                    productos.append({
+                        'nombre': producto['nombre'],
+                        'cantidad': cantidad,
+                        'precio_sin_iva': precio_sin_iva,
+                        'subtotal_sin_iva': prod_subtotal
+                    })
+            
+            # Calcular totales
+            iva = subtotal * 0.16
+            total = subtotal + iva
+            
+            # Calcular saldo pendiente
+            saldo = total
+            pagos_query = db_firestore.collection('pagos_parciales')\
+                .where('deuda_id', '==', deuda_doc.id).stream()
+            
+            for pago_doc in pagos_query:
+                pago_data = pago_doc.to_dict()
+                saldo -= pago_data.get('monto_usd', 0)
+            
+            # Determinar color según estado
+            estado = deuda_data.get('estado', 'pendiente')
+            color_estado = '#FFE0B2' if estado == 'pendiente' else '#C8E6C9'  # Naranja claro o verde claro
+            
+            deudas_lista.append({
+                'id': deuda_doc.id,
+                'cliente_nombre': cliente.get('nombre', 'Sin nombre'),
+                'cliente_cedula': cliente.get('cedula', ''),
+                'direccion': cliente.get('cliente_direccion', ''),
+                'telefono': cliente.get('cliente_telefono', ''),
+                'fecha': deuda_data.get('fecha', None),
+                'productos': productos,
+                'subtotal': subtotal,
+                'iva': iva,
+                'total': total,
+                'saldo': saldo,
+                'estado': estado,
+                'color': color_estado
+            })
+        
+        # Ordenar: primero pendientes, luego pagadas
+        deudas_lista.sort(key=lambda x: (x['estado'] != 'pendiente', x['fecha'] if x['fecha'] else datetime.min), reverse=False)
+        
+        # Crear PDF
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+        
+        y_position = height - 50
+        page_num = 1
+        
+        # Función para agregar encabezado de página
+        def add_header():
+            nonlocal y_position, page_num
+            p.setFont("Helvetica-Bold", 16)
+            p.drawString(50, height - 30, "Reporte de Deudas")
+            p.setFont("Helvetica", 9)
+            p.drawString(50, height - 45, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+            p.drawString(width - 150, height - 45, f"Página {page_num}")
+            y_position = height - 70
+        
+        add_header()
+        
+        # Procesar cada deuda
+        for deuda in deudas_lista:
+            # Verificar si necesita nueva página
+            if y_position < 150:
+                p.showPage()
+                page_num += 1
+                add_header()
+            
+            # Encabezado de deuda
+            p.setFillAlphaBlended(deuda['color'], 1)
+            p.rect(50, y_position - 20, width - 100, 25, fill=1, stroke=0)
+            p.setFillAlphaBlended('black', 1)
+            p.setFont("Helvetica-Bold", 11)
+            p.drawString(55, y_position - 5, f"Deuda #{deuda['id']} - {deuda['fecha'].strftime('%d/%m/%Y') if deuda['fecha'] else 'N/A'}")
+            
+            # Información del cliente
+            p.setFont("Helvetica", 9)
+            y_position -= 35
+            p.drawString(55, y_position, f"Cliente: {deuda['cliente_nombre']}")
+            p.drawString(55, y_position - 12, f"Cédula: {deuda['cliente_cedula']}")
+            p.drawString(55, y_position - 24, f"Teléfono: {deuda['telefono']}")
+            y_position -= 40
+            
+            # Tabla de productos
+            col_widths = [200, 60, 90, 90]
+            headers = ['Producto', 'Cant', 'P. Unitario', 'Subtotal']
+            
+            # Encabezado tabla
+            p.setFont("Helvetica-Bold", 8)
+            p.setFillAlphaBlended('#E0E0E0', 1)
+            p.rect(50, y_position - 12, width - 100, 12, fill=1, stroke=0)
+            p.setFillAlphaBlended('black', 1)
+            
+            x_pos = 55
+            for i, header in enumerate(headers):
+                p.drawString(x_pos, y_position - 8, header)
+                x_pos += col_widths[i]
+            
+            y_position -= 18
+            
+            # Filas de productos
+            p.setFont("Helvetica", 8)
+            for producto in deuda['productos']:
+                if y_position < 100:
+                    p.showPage()
+                    page_num += 1
+                    add_header()
+                
+                x_pos = 55
+                p.drawString(x_pos, y_position, producto['nombre'][:30])
+                x_pos += col_widths[0]
+                p.drawString(x_pos, y_position, str(producto['cantidad']))
+                x_pos += col_widths[1]
+                p.drawString(x_pos, y_position, f"${producto['precio_sin_iva']:.2f}")
+                x_pos += col_widths[2]
+                p.drawString(x_pos, y_position, f"${producto['subtotal_sin_iva']:.2f}")
+                
+                y_position -= 12
+            
+            # Totales
+            y_position -= 5
+            p.setFont("Helvetica-Bold", 9)
+            p.drawString(300, y_position, f"Subtotal: ${deuda['subtotal']:.2f}")
+            y_position -= 12
+            p.drawString(300, y_position, f"IVA (16%): ${deuda['iva']:.2f}")
+            y_position -= 12
+            p.drawString(300, y_position, f"Total: ${deuda['total']:.2f}")
+            y_position -= 12
+            p.setFont("Helvetica-Bold", 10)
+            estado_text = f"Saldo Pendiente: ${deuda['saldo']:.2f} ({deuda['estado'].upper()})"
+            p.drawString(300, y_position, estado_text)
+            
+            # Línea separadora
+            y_position -= 20
+            p.setLineWidth(0.5)
+            p.line(50, y_position, width - 50, y_position)
+            y_position -= 10
+        
+        p.save()
+        buffer.seek(0)
+        
+        # Determinar nombre del archivo
+        fecha_str = datetime.now().strftime('%d%m%Y_%H%M%S')
+        filtro_nombre = {
+            'todas': 'todas',
+            'pendiente': 'pendientes',
+            'pagada': 'pagadas'
+        }.get(filtro_estado, 'todas')
+        
+        filename = f'deudas_{filtro_nombre}_{fecha_str}.pdf'
+        
+        return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name=filename)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        flash(f'Error al generar PDF: {str(e)}', 'danger')
+        return redirect(url_for('consultar_deudas'))
+
 @app.route('/exportar_todas_deudas_pdf')
 @login_required
 def exportar_todas_deudas_pdf_route():
