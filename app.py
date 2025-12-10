@@ -909,7 +909,7 @@ def consultar_deudas():
         import traceback
         traceback.print_exc()
         flash(f'Error al cargar deudas: {str(e)}', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('index'))
 
 
 @app.route('/eliminar_producto_temp/<int:index>', methods=['POST'])
@@ -2115,7 +2115,7 @@ def exportar_deudas_pdf_filtrado():
 def tienda():
     # Obtener productos con stock
     productos = []
-    query = db_firestore.collection('productos').where('cantidad', '>', 0)
+    query = db_firestore.collection('productos').where(filter=FieldFilter('cantidad', '>', 0))
     
     for doc in query.stream():
         producto = doc.to_dict()
