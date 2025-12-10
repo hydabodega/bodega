@@ -2098,178 +2098,159 @@ def ver_pedido(pedido_id):
     
     return render_template('detalle_pedido.html', pedido=pedido, items=items)
 
+from datetime import datetime
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib import colors
-from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+from reportlab.lib.units import inch
 from io import BytesIO
-from datetime import datetime
+from flask import send_file
 
-def exportar_deudas_pdf_filtrado():
-    """
-    Exporta todas las deudas a PDF con opción de filtro por estado.
-    Deudas pendientes en naranja, pagadas en verde, ordenadas por estado.
-    """
+@app.route('/exportar_deudas_pdf', methods=['POST'])
+@login_required
+def exportar_deudas_pdf():
     try:
-        # Obtener parámetro de filtro
-        filtro = request.args.get('filtro', 'todas').lower()  # 'todas', 'pendientes', 'pagadas'
+        # Obtener filtro del formulario
+        filtro_estado = request.form.get('filtro_estado', 'todas')
         
-        # Obtener todas las deudas
-        db = get_db()
-        cursor = db.cursor(dictionary=True)
+        # Obtener todas las deudas de Firestore
+        deudas_ref = db_firestore.collection('deudas')
+        deudas_docs = deudas_ref.stream()
         
-        query = "SELECT * FROM deudas"
-        cursor.execute(query)
-        deudas = cursor.fetchall()
+        deudas = []
+        for deuda_doc in deudas_docs:
+            deuda_data = deuda_doc.to_dict()
+            estado = deuda_data.get('estado', 'pendiente')
+            
+            # Aplicar filtro de estado
+            if filtro_estado == 'pendientes' and estado != 'pendiente':
+                continue
+            elif filtro_estado == 'pagadas' and estado != 'pagada':
+                continue
+            
+            # Obtener cliente
+            cliente_ref = deuda_data.get('cliente_id')
+            cliente_id = cliente_ref.id if isinstance(cliente_ref, DocumentReference) else cliente_ref
+            cliente_doc = db_firestore.collection('clientes').document(cliente_id).get()
+            cliente = cliente_doc.to_dict() if cliente_doc.exists else {}
+            
+            # Calcular total y saldo
+            total = 0.0
+            productos_query = db_firestore.collection('productos_deuda').where('deuda_id', '==', deuda_doc.id).stream()
+            
+            for prod_doc in productos_query:
+                prod_data = prod_doc.to_dict()
+                producto_id = prod_data.get('producto_id')
+                cantidad = prod_data.get('cantidad', 0)
+                
+                if isinstance(producto_id, DocumentReference):
+                    producto_ref = producto_id
+                elif isinstance(producto_id, str):
+                    producto_ref = db_firestore.collection('productos').document(producto_id)
+                else:
+                    continue
+                
+                producto_doc = producto_ref.get()
+                if producto_doc.exists:
+                    producto = producto_doc.to_dict()
+                    precio = producto.get('precio', 0.0)
+                    total += precio * cantidad
+            
+            # Calcular saldo pendiente
+            saldo = total
+            pagos_query = db_firestore.collection('pagos_parciales').where('deuda_id', '==', deuda_doc.id).stream()
+            
+            for pago_doc in pagos_query:
+                pago_data = pago_doc.to_dict()
+                monto = pago_data.get('monto_usd', 0.0)
+                saldo -= monto
+            
+            deudas.append({
+                'id': deuda_doc.id,
+                'cliente_nombre': cliente.get('nombre', 'Desconocido'),
+                'cliente_cedula': cliente.get('cedula', ''),
+                'fecha': deuda_data.get('fecha', datetime.now()),
+                'estado': estado,
+                'total': total,
+                'saldo_pendiente': saldo
+            })
         
-        # Filtrar deudas según el parámetro
-        if filtro == 'pendientes':
-            deudas = [d for d in deudas if d.get('saldo_pendiente', 0) > 0]
-        elif filtro == 'pagadas':
-            deudas = [d for d in deudas if d.get('saldo_pendiente', 0) <= 0]
-        
-        # Ordenar: pendientes primero, luego pagadas
-        deudas_pendientes = [d for d in deudas if d.get('saldo_pendiente', 0) > 0]
-        deudas_pagadas = [d for d in deudas if d.get('saldo_pendiente', 0) <= 0]
-        deudas_ordenadas = deudas_pendientes + deudas_pagadas
+        # Ordenar: primero pendientes, luego pagadas
+        deudas.sort(key=lambda x: (x['estado'] != 'pendiente', x['fecha']), reverse=False)
         
         # Crear PDF con Platypus
         buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer, 
-            pagesize=letter,
-            rightMargin=30,
-            leftMargin=30,
-            topMargin=40,
-            bottomMargin=30,
-            title="Reporte de Deudas"
-        )
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
         
-        # Estilos
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            textColor=colors.HexColor('#1a1a1a'),
-            spaceAfter=6,
-            alignment=TA_CENTER,
-            fontName='Helvetica-Bold'
-        )
-        
-        normal_style = ParagraphStyle(
-            'Normal',
-            fontSize=9,
-            alignment=TA_CENTER,
-            valign='MIDDLE'
-        )
-        
-        # Contenido del documento
         story = []
         
-        # Título y fecha
+        # Encabezado
+        titulo_style = ParagraphStyle(
+            'Titulo',
+            parent=styles['Heading1'],
+            fontSize=14,
+            textColor=colors.HexColor('#1f2937'),
+            spaceAfter=6
+        )
+        
         fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M')
-        story.append(Paragraph("REPORTE DE DEUDAS", title_style))
-        story.append(Paragraph(f"Generado: {fecha_actual}", styles['Normal']))
-        story.append(Paragraph(f"Filtro: {filtro.upper()}", styles['Normal']))
+        story.append(Paragraph(f"Reporte de Deudas - {fecha_actual}", titulo_style))
         story.append(Spacer(1, 0.2*inch))
         
-        # Construir tabla de deudas
-        data = [['ID', 'Cliente', 'Cédula', 'Fecha', 'Monto', 'Saldo', 'Estado']]
+        # Tabla de deudas
+        data = [['Cliente', 'Cédula', 'Fecha', 'Total', 'Saldo Pendiente', 'Estado']]
         
-        for deuda in deudas_ordenadas:
-            estado_pago = 'PAGADA' if deuda.get('saldo_pendiente', 0) <= 0 else 'PENDIENTE'
-            
+        for deuda in deudas:
+            fecha_str = deuda['fecha'].strftime('%d/%m/%Y') if hasattr(deuda['fecha'], 'strftime') else str(deuda['fecha'])
             data.append([
-                str(deuda.get('id_deuda', '')),
-                str(deuda.get('nombre_cliente', '')),
-                str(deuda.get('cedula_cliente', '')),
-                deuda.get('fecha', '').strftime('%d/%m/%Y') if hasattr(deuda.get('fecha'), 'strftime') else str(deuda.get('fecha', '')),
-                f"${deuda.get('monto_total', 0):.2f}",
-                f"${deuda.get('saldo_pendiente', 0):.2f}",
-                estado_pago
+                deuda['cliente_nombre'],
+                deuda['cliente_cedula'],
+                fecha_str,
+                f"${deuda['total']:.2f}",
+                f"${deuda['saldo_pendiente']:.2f}",
+                deuda['estado'].capitalize()
             ])
         
         # Crear tabla con estilos
-        table = Table(data, colWidths=[0.6*inch, 1.5*inch, 1*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.8*inch])
+        table = Table(data, colWidths=[2*inch, 1.1*inch, 0.9*inch, 0.9*inch, 1.3*inch, 0.9*inch])
         
+        # Estilos con colores por estado
         table_style = [
-            # Encabezado
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#374151')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('TOPPADDING', (0, 0), (-1, 0), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
-            ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('ROWPADDING', (0, 1), (-1, -1), 6),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#d1d5db')),
         ]
         
-        # Colorear filas según estado (pendiente = naranja, pagada = verde)
-        row_num = 1
-        for deuda in deudas_ordenadas:
-            is_pendiente = deuda.get('saldo_pendiente', 0) > 0
-            
-            if is_pendiente:
+        # Aplicar colores por estado de deuda
+        for i, deuda in enumerate(deudas, start=1):
+            if deuda['estado'] == 'pendiente':
                 # Naranja claro para pendientes
-                background_color = colors.HexColor('#FFE0B2')
-                text_color = colors.HexColor('#E65100')
+                table_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#FED7AA')))
             else:
                 # Verde claro para pagadas
-                background_color = colors.HexColor('#C8E6C9')
-                text_color = colors.HexColor('#2E7D32')
-            
-            table_style.append(
-                ('BACKGROUND', (0, row_num), (-1, row_num), background_color)
-            )
-            table_style.append(
-                ('TEXTCOLOR', (0, row_num), (-1, row_num), text_color)
-            )
-            table_style.append(
-                ('FONTNAME', (0, row_num), (-1, row_num), 'Helvetica-Bold')
-            )
-            row_num += 1
+                table_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#D1FAE5')))
         
         table.setStyle(TableStyle(table_style))
         story.append(table)
         
-        # Resumen
-        story.append(Spacer(1, 0.3*inch))
-        total_deudas = len(deudas_ordenadas)
-        total_monto = sum(d.get('monto_total', 0) for d in deudas_ordenadas)
-        total_saldo = sum(d.get('saldo_pendiente', 0) for d in deudas_ordenadas)
-        
-        resumen = f"""
-        <b>RESUMEN:</b><br/>
-        Total de deudas: {total_deudas}<br/>
-        Monto total: ${total_monto:.2f}<br/>
-        Saldo pendiente: ${total_saldo:.2f}
-        """
-        story.append(Paragraph(resumen, styles['Normal']))
-        
-        # Generar PDF
+        # Construir PDF
         doc.build(story)
+        
         buffer.seek(0)
-        
-        # Nombre del archivo
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"deudas_{filtro}_{timestamp}.pdf"
-        
-        return send_file(
-            buffer,
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name=filename
-        )
+        nombre_archivo = f"deudas_{filtro_estado}_{datetime.now().strftime('%d%m%Y_%H%M%S')}.pdf"
+        return send_file(buffer, as_attachment=True, download_name=nombre_archivo, mimetype='application/pdf')
     
     except Exception as e:
-        return {"error": f"Error al generar PDF: {str(e)}"}, 500
+        flash(f'Error al generar PDF: {str(e)}', 'danger')
+        return redirect(url_for('consultar_deudas'))
 
 @app.route('/exportar_deudas_pdf_filtrado', methods=['GET'])
 @login_required
