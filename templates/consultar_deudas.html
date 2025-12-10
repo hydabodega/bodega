@@ -4,32 +4,46 @@
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-0">Consulta de Deudas</h2>
-            <p class="text-muted mb-0">Administra las deudas registradas en el sistema</p>
+            <h2 class="mb-0">Gestión de Deudas</h2>
+            <p class="text-muted mb-0">Consulta y gestiona todas las deudas de tus clientes</p>
         </div>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-2"></i> Volver
-        </a>
+        <div class="btn-group">
+            <!-- Agregar selector de filtro para exportación a PDF -->
+            <select id="filtroExportacion" class="form-select form-select-sm" style="width: auto;">
+                <option value="todas">Exportar: Todas</option>
+                <option value="pendiente">Exportar: Pendientes</option>
+                <option value="pagada">Exportar: Pagadas</option>
+            </select>
+            <button class="btn btn-primary btn-sm ms-2" id="btnExportarPDF">
+                <i class="bi bi-file-earmark-pdf"></i> Exportar a PDF
+            </button>
+        </div>
     </div>
 
-        <div class="card border-0 shadow-sm mb-4">
+    <!-- Filtros de búsqueda -->
+    <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
-            <form method="GET" class="row g-3">
-                <div class="col-md-3">
-                    <label for="estado" class="form-label">Estado</label>
-                    <select class="form-select" name="estado" id="estado">
-                        <option value="todos" {% if estado_filtro == 'todos' %}selected{% endif %}>Todos</option>
-                        <option value="pendiente" {% if estado_filtro == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                        <option value="pagada" {% if estado_filtro == 'pagada' %}selected{% endif %}>Pagada</option>
+            <form method="GET" action="{{ url_for('consultar_deudas') }}" class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Filtrar por Estado</label>
+                    <select name="estado" class="form-select">
+                        <option value="todos" {% if estado_filtro == 'todos' %}selected{% endif %}>Todas</option>
+                        <option value="pendiente" {% if estado_filtro == 'pendiente' %}selected{% endif %}>Pendientes</option>
+                        <option value="pagada" {% if estado_filtro == 'pagada' %}selected{% endif %}>Pagadas</option>
                     </select>
                 </div>
-                <div class="col-md-5">
-                    <label for="cedula" class="form-label">Cedula del Cliente</label>
-                    <input type="text" class="form-control" name="cedula" id="cedula" value="{{ cedula_filtro }}">
+                <div class="col-md-6">
+                    <label class="form-label">Filtrar por Cédula</label>
+                    <input type="text" name="cedula" class="form-control" placeholder="Ej: 12345678" 
+                           value="{{ cedula_filtro }}">
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary me-2">Filtrar</button>
-                    <a href="{{ url_for('consultar_deudas') }}" class="btn btn-outline-secondary">Limpiar</a>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-funnel"></i> Filtrar
+                    </button>
+                    <a href="{{ url_for('consultar_deudas') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i> Limpiar
+                    </a>
                 </div>
             </form>
         </div>
