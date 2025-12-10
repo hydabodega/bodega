@@ -4,271 +4,116 @@
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-0">Deudas de {{ cliente['nombre'] }} ({{ cliente['cedula'] }})</h2>
-            <p class="text-muted mb-0">Administra las deudas pendientes y pagadas</p>
+            <h2 class="mb-0">Gestión de Deudas</h2>
+            <p class="text-muted mb-0">Consulta y gestiona todas las deudas de tus clientes</p>
         </div>
-        <a href="{{ url_for('consultar_deudas') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-2"></i> Volver
-        </a>
+        <div class="btn-group">
+            <!-- Agregar selector de filtro para exportación a PDF -->
+            <select id="filtroExportacion" class="form-select form-select-sm" style="width: auto;">
+                <option value="todas">Exportar: Todas</option>
+                <option value="pendiente">Exportar: Pendientes</option>
+                <option value="pagada">Exportar: Pagadas</option>
+            </select>
+            <button class="btn btn-primary btn-sm ms-2" id="btnExportarPDF">
+                <i class="bi bi-file-earmark-pdf"></i> Exportar a PDF
+            </button>
+        </div>
     </div>
 
+    <!-- Filtros de búsqueda -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
-            <ul class="nav nav-tabs mb-4" id="deudasTab" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="pendientes-tab" data-bs-toggle="tab" data-bs-target="#pendientes" type="button" role="tab">
-                        Pendientes <span class="badge bg-warning ms-2">{{ deudas_pendientes|length }}</span>
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="pagadas-tab" data-bs-toggle="tab" data-bs-target="#pagadas" type="button" role="tab">
-                        Pagadas <span class="badge bg-success ms-2">{{ deudas_pagadas|length }}</span>
-                    </button>
-                </li>
-            </ul>
-            
-            <div class="tab-content" id="deudasTabContent">
-                <!-- Pestaña de deudas pendientes -->
-                <div class="tab-pane fade show active" id="pendientes" role="tabpanel">
-                    {% if deudas_pendientes %}
-                        {% for deuda in deudas_pendientes %}
-                        <div class="card mb-4 border-start border-3 border-warning">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="mb-0">Deuda #{{ deuda.id }} - {{ deuda.fecha.strftime('%d/%m/%Y') }}</h5>
-                                    <div class="mt-2">
-                                        <p class="mb-1"><strong>Cliente:</strong> {{ cliente['nombre'] }}</p>
-                                        <p class="mb-1"><strong>Cédula:</strong> {{ cliente['cedula'] }}</p>
-                                        <p class="mb-1"><strong>Dirección:</strong> {{ cliente['direccion'] }}</p>
-                                        <p class="mb-1"><strong>Teléfono:</strong> {{ cliente['telefono'] }}</p>
-                                    </div>
-                                </div>
-                                <div>
-                                    <span class="badge bg-{{ 'success' if deuda.estado == 'pagada' else 'warning' }}">
-                                         {{ 'Pagada' if deuda.estado == 'pagada' else 'Pendiente' }}
-                                    </span>
-                                    <span class="ms-2">Saldo: ${{ deuda.saldo_pendiente|round(2) }} USD</span>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <!-- Tabla de productos -->
-                                <div class="table-responsive mb-4">
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Producto</th>
-                                                <th>Cantidad</th>
-                                                <th>P. Unitario (sin IVA)</th>
-                                                <th>Subtotal (sin IVA)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for producto in deuda.productos %}
-                                                <tr>
-                                                    <td>{{ producto.producto.nombre }}</td>
-                                                    <td>{{ producto.cantidad }}</td>
-                                                    <td>{{ producto.precio_sin_iva|round(2) }} USD</td>
-                                                    <td>{{ producto.subtotal_sin_iva|round(2) }} USD</td>
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr>
-                                                <td colspan="3" class="text-end fw-bold">Sub Total:</td>
-                                                <td class="fw-bold">{{ deuda.subtotal_sin_iva|round(2) }} USD</td>
-                                            </tr>
-                                            <tr>
-                                                <td colspan="3" class="text-end fw-bold">IVA (16%):</td>
-                                                <td class="fw-bold">{{ deuda.iva|round(2) }} USD</td>
-                                            </tr>
-                                            <tr>
-                                                <td colspan="3" class="text-end fw-bold">Total Deuda:</td>
-                                                <td class="fw-bold">{{ deuda.total_con_iva|round(2) }} USD</td>
-                                            </tr>
-                                            <tr>
-                                                <td colspan="3" class="text-end fw-bold">Saldo Pendiente:</td>
-                                                <td class="fw-bold">{{ deuda.saldo_pendiente|round(2) }} USD</td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                                
-                                <!-- Historial de pagos -->
-                                {% if deuda.pagos_parciales %}
-                                <div class="mt-4">
-                                    <h6>Historial de Pagos</h6>
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Fecha</th>
-                                                <th>Monto (USD)</th>
-                                                <th>Descripción</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for pago in deuda.pagos_parciales %}
-                                            <tr>
-                                                <td>
-                                                    {% if pago.fecha %}
-                                                        {{ pago.fecha.strftime('%d/%m/%Y') }}
-                                                    {% else %}
-                                                        -
-                                                    {% endif %}
-                                                </td>
-                                                <td>{{ pago.monto_usd|round(2) }}</td>
-                                                <td>{{ pago.descripcion }}</td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {% endif %}
-                                
-                                <!-- Formulario de pago parcial -->
-                                <div class="border p-3 bg-light rounded mt-4">
-                                    <h5>Registrar Pago Parcial</h5>
-                                    <form method="POST" action="{{ url_for('registrar_pago_parcial', deuda_id=deuda.id) }}">
-                                        <input type="hidden" name="cliente_id" value="{{ cliente.id }}">
-                                        <div class="row g-3">
-                                            <div class="col-md-4">
-                                                <label class="form-label">Monto (USD)</label>
-                                                <input type="number" step="0.01" min="0.01" max="{{ deuda.saldo_pendiente }}"
-                                                   class="form-control" name="monto" 
-                                                   value="{{ deuda.saldo_pendiente if deuda.saldo_pendiente > 0 else 0.01 }}"
-                                                   required>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Descripción</label>
-                                                <input type="text" class="form-control" name="descripcion" 
-                                                    placeholder="Ej: Pago parcial, Ajuste de deuda, etc.">
-                                            </div>
-                                            <div class="col-md-2 d-flex align-items-end">
-                                                <button type="submit" class="btn btn-primary">Registrar</button>
-                                            </div>
-                                        </div>
-                                    </form>
-                                </div>
-                                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
-                                    <a href="{{ url_for('descargar_factura', deuda_id=deuda.id) }}" 
-                                     class="btn btn-info">
-                                        <i class="bi bi-file-earmark-pdf"></i> Descargar Factura
-                                    </a>
-                                 </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="alert alert-success">
-                            <i class="bi bi-check-circle me-2"></i> ¡Felicidades! No tiene deudas pendientes.
-                        </div>
-                    {% endif %}
+            <form method="GET" action="{{ url_for('consultar_deudas') }}" class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Filtrar por Estado</label>
+                    <select name="estado" class="form-select">
+                        <option value="todos" {% if estado_filtro == 'todos' %}selected{% endif %}>Todas</option>
+                        <option value="pendiente" {% if estado_filtro == 'pendiente' %}selected{% endif %}>Pendientes</option>
+                        <option value="pagada" {% if estado_filtro == 'pagada' %}selected{% endif %}>Pagadas</option>
+                    </select>
                 </div>
-                
-                <!-- Pestaña de deudas pagadas -->
-                <div class="tab-pane fade" id="pagadas" role="tabpanel">
-                    {% if deudas_pagadas %}
-                        {% for deuda in deudas_pagadas %}
-                        <div class="card mb-4 border-start border-3 border-success">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="mb-0">Deuda #{{ deuda.id }} - {{ deuda.fecha.strftime('%d/%m/%Y') }}</h5>
-                                    <div class="mt-2 text-dark"></div>>
-                                        <p class="mb-1"><strong>Cliente:</strong> {{ cliente['nombre'] }}</p>
-                                        <p class="mb-1"><strong>Cédula:</strong> {{ cliente['cedula'] }}</p>
-                                        <p class="mb-1"><strong>Dirección:</strong> {{ cliente['direccion'] }}</p>
-                                        <p class="mb-1"><strong>Teléfono:</strong> {{ cliente['telefono'] }}</p>
-                                    </div>
-                                </div>
-                                <div>
+                <div class="col-md-6">
+                    <label class="form-label">Filtrar por Cédula</label>
+                    <input type="text" name="cedula" class="form-control" placeholder="Ej: 12345678" 
+                           value="{{ cedula_filtro }}">
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-funnel"></i> Filtrar
+                    </button>
+                    <a href="{{ url_for('consultar_deudas') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i> Limpiar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de deudas -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            {% if deudas %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID Deuda</th>
+                            <th>Cliente</th>
+                            <th>Cédula</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th>Total</th>
+                            <th>Saldo Pendiente</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for deuda in deudas %}
+                        <!-- Ordenar deudas: pendientes primero (naranja), luego pagadas (verde) -->
+                        <tr class="{% if deuda.estado == 'pendiente' %}table-warning{% else %}table-success{% endif %}">
+                            <td><strong>#{{ deuda.id[:8] }}</strong></td>
+                            <td>{{ deuda.cliente_nombre }}</td>
+                            <td>{{ deuda.cliente_cedula }}</td>
+                            <td>{{ deuda.fecha.strftime('%d/%m/%Y') if deuda.fecha else 'N/A' }}</td>
+                            <td>
+                                {% if deuda.estado == 'pendiente' %}
+                                    <span class="badge bg-warning text-dark">Pendiente</span>
+                                {% else %}
                                     <span class="badge bg-success">Pagada</span>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <!-- Tabla de productos -->
-                                <div class="table-responsive mb-4">
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Producto</th>
-                                                <th>Cantidad</th>
-                                                <th>P. Unitario (sin IVA)</th>
-                                                <th>Subtotal (sin IVA)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for producto in deuda.productos %}
-                                                <tr>
-                                                    <td>{{ producto.producto.nombre }}</td>
-                                                    <td>{{ producto.cantidad }}</td>
-                                                    <td>{{ producto.precio_sin_iva|round(2) }} USD</td>
-                                                    <td>{{ producto.subtotal_sin_iva|round(2) }} USD</td>
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr>
-                                                <td colspan="3" class="text-end fw-bold">Sub Total:</td>
-                                                <td class="fw-bold">{{ deuda.subtotal_sin_iva|round(2) }} USD</td>
-                                            </tr>
-                                            <tr>
-                                                <td colspan="3" class="text-end fw-bold">IVA (16%):</td>
-                                                <td class="fw-bold">{{ deuda.iva|round(2) }} USD</td>
-                                            </tr>
-                                            <tr>
-                                                <td colspan="3" class="text-end fw-bold">Total Deuda:</td>
-                                                <td class="fw-bold">{{ deuda.total_con_iva|round(2) }} USD</td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                                
-                                <!-- Historial de pagos -->
-                                {% if deuda.pagos_parciales %}
-                                <div class="mt-4">
-                                    <h6>Historial de Pagos</h6>
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Fecha</th>
-                                                <th>Monto (USD)</th>
-                                                <th>Descripción</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for pago in deuda.pagos_parciales %}
-                                            <tr>
-                                                <td>
-                                                    {% if pago.fecha %}
-                                                        {{ pago.fecha.strftime('%d/%m/%Y') }}
-                                                    {% else %}
-                                                        -
-                                                    {% endif %}
-                                                </td>
-                                                <td>{{ pago.monto_usd|round(2) }}</td>
-                                                <td>{{ pago.descripcion }}</td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
                                 {% endif %}
-                                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
-                                    <a href="{{ url_for('descargar_factura', deuda_id=deuda.id) }}" 
-                                        class="btn btn-info">
-                                        <i class="bi bi-file-earmark-pdf"></i> Descargar Factura
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
+                            </td>
+                            <td>${{ deuda.total|round(2) }}</td>
+                            <td>
+                                {% if deuda.saldo_pendiente > 0 %}
+                                    <span class="text-danger fw-bold">${{ deuda.saldo_pendiente|round(2) }}</span>
+                                {% else %}
+                                    <span class="text-success">$0.00</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('ver_deuda_cliente', cliente_id=deuda.cliente_id) }}" 
+                                   class="btn btn-sm btn-info">
+                                    <i class="bi bi-eye"></i> Ver
+                                </a>
+                            </td>
+                        </tr>
                         {% endfor %}
-                    {% else %}
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle me-2"></i> No tiene deudas pagadas registradas.
-                        </div>
-                    {% endif %}
-                </div>
+                    </tbody>
+                </table>
             </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i> No hay deudas registradas con los filtros seleccionados.
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('btnExportarPDF').addEventListener('click', function() {
+    const filtro = document.getElementById('filtroExportacion').value;
+    window.location.href = `{{ url_for('exportar_deudas_pdf') }}?filtro=${filtro}`;
+});
+</script>
 {% endblock %}
