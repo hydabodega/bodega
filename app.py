@@ -817,19 +817,15 @@ def registrar_deuda():
 @login_required
 def consultar_deudas():
     try:
-        # Obtener parámetros de filtro
         estado_filtro = request.args.get('estado', 'todos')
         cedula_filtro = request.args.get('cedula', '').strip().lower()
         
-        # Construir consulta base
-        deudas_ref = db_firestore.collection('deudas')
+        query = db_firestore.collection('deudas')
         
-        # Aplicar filtro de estado si no es 'todos'
         if estado_filtro != 'todos':
-            deudas_ref = deudas_ref.where(filter=FieldFilter('estado', '==', estado_filtro))
+            query = query.where(filter=FieldFilter('estado', '==', estado_filtro))
         
-        # Ejecutar consulta inicial
-        deudas_docs = deudas_ref.stream()
+        deudas_docs = query.stream()
         
         deudas = []
         for deuda_doc in deudas_docs:
@@ -862,7 +858,7 @@ def consultar_deudas():
             # Calcular total de la deuda
             total = 0.0
             productos_query = db_firestore.collection('productos_deuda')\
-                .where('deuda_id', '==', deuda_doc.id).stream()
+                .where(filter=FieldFilter('deuda_id', '==', deuda_doc.id)).stream()
             
             for prod_doc in productos_query:
                 prod_data = prod_doc.to_dict()
@@ -888,7 +884,7 @@ def consultar_deudas():
             # Calcular saldo pendiente
             saldo = total
             pagos_query = db_firestore.collection('pagos_parciales')\
-                .where('deuda_id', '==', deuda_doc.id).stream()
+                .where(filter=FieldFilter('deuda_id', '==', deuda_doc.id)).stream()
             
             for pago_doc in pagos_query:
                 pago_data = pago_doc.to_dict()
@@ -908,12 +904,13 @@ def consultar_deudas():
         
         return render_template('consultar_deudas.html', deudas=deudas, 
                                estado_filtro=estado_filtro, cedula_filtro=cedula_filtro,
-                          form=EmptyForm())
+                               form=EmptyForm())
     except Exception as e:
         import traceback
         traceback.print_exc()
         flash(f'Error al cargar deudas: {str(e)}', 'danger')
         return redirect(url_for('dashboard'))
+
 
 @app.route('/eliminar_producto_temp/<int:index>', methods=['POST'])
 @login_required
@@ -1938,15 +1935,6 @@ def exportar_deudas_pdf_filtrado():
     except Exception as e:
         return {"error": f"Error al generar PDF: {str(e)}"}, 500
 
-@app.route('/exportar_deudas_pdf_filtrado', methods=['GET'])
-@login_required
-def exportar_deudas_pdf_filtrado_route():
-    """
-    Ruta para exportar deudas a PDF con filtro por estado.
-    Parámetro: filtro=todas|pendientes|pagadas
-    """
-    return exportar_deudas_pdf_filtrado()
-
 # Función para inyectar datos de la empresa en todas las plantillas
 @app.context_processor
 def inject_empresa():
@@ -1955,6 +1943,172 @@ def inject_empresa():
     if empresa_doc.exists:
         return {'empresa': empresa_doc.to_dict()}
     return {'empresa': None}
+
+# Nueva ruta para exportar deudas a PDF
+@app.route('/exportar_deudas_pdf_filtrado', methods=['GET'])
+@login_required
+def exportar_deudas_pdf_filtrado():
+    try:
+        filtro = request.args.get('filtro', 'todas')
+        
+        query = db_firestore.collection('deudas')
+        
+        if filtro == 'pendientes':
+            query = query.where(filter=FieldFilter('estado', '==', 'pendiente'))
+        elif filtro == 'pagadas':
+            query = query.where(filter=FieldFilter('estado', '==', 'pagada'))
+        
+        deudas_docs = query.stream()
+        
+        deudas = []
+        for deuda_doc in deudas_docs:
+            deuda_data = deuda_doc.to_dict()
+            deuda = {
+                'id': deuda_doc.id,
+                'estado': deuda_data.get('estado', 'pendiente'),
+                'fecha': deuda_data.get('fecha', None),
+                'cliente_cedula': deuda_data.get('cliente_cedula', '')
+            }
+            
+            # Obtener referencia al cliente
+            cliente_ref = deuda_data.get('cliente_id')
+            cliente_id = None
+            if isinstance(cliente_ref, DocumentReference):
+                cliente_id = cliente_ref.id
+            elif isinstance(cliente_ref, str):
+                cliente_id = cliente_ref
+            else:
+                continue
+                
+            # Obtener nombre del cliente
+            cliente_doc = db_firestore.collection('clientes').document(cliente_id).get()
+            if cliente_doc.exists:
+                deuda['cliente_nombre'] = cliente_doc.to_dict().get('nombre', '')
+            else:
+                deuda['cliente_nombre'] = 'Cliente eliminado'
+            deuda['cliente_id'] = cliente_id
+
+            # Calcular total de la deuda
+            total = 0.0
+            productos_query = db_firestore.collection('productos_deuda')\
+                .where(filter=FieldFilter('deuda_id', '==', deuda_doc.id)).stream()
+            
+            for prod_doc in productos_query:
+                prod_data = prod_doc.to_dict()
+                producto_id = prod_data.get('producto_id', '')
+                cantidad = prod_data.get('cantidad', 0)
+                
+                if producto_id:
+                    if isinstance(producto_id, DocumentReference):
+                        producto_ref = producto_id
+                    elif isinstance(producto_id, str):
+                        producto_ref = db_firestore.collection('productos').document(producto_id)
+                    else:
+                        continue
+                    
+                    producto_doc = producto_ref.get()
+                    if producto_doc.exists:
+                        producto = producto_doc.to_dict()
+                        precio = producto.get('precio', 0.0)
+                        total += precio * cantidad
+
+            deuda['total'] = total
+            
+            # Calcular saldo pendiente
+            saldo = total
+            pagos_query = db_firestore.collection('pagos_parciales')\
+                .where(filter=FieldFilter('deuda_id', '==', deuda_doc.id)).stream()
+            
+            for pago_doc in pagos_query:
+                pago_data = pago_doc.to_dict()
+                monto = pago_data.get('monto_usd', 0.0)
+                saldo -= monto
+
+            deuda['saldo_pendiente'] = saldo
+            deudas.append(deuda)
+        
+        # Ordenar por fecha descendente
+        deudas.sort(key=lambda x: x['fecha'] if x['fecha'] else datetime.min, reverse=True)
+        
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+        
+        # Encabezado
+        p.setFont("Helvetica-Bold", 16)
+        p.drawString(72, height - 72, "Reporte de Deudas")
+        p.setFont("Helvetica", 10)
+        fecha_reporte = datetime.now().strftime('%d/%m/%Y %H:%M')
+        p.drawString(72, height - 92, f"Generado: {fecha_reporte}")
+        
+        if filtro == 'pendientes':
+            p.drawString(72, height - 112, "Filtro: Solo Deudas Pendientes")
+        elif filtro == 'pagadas':
+            p.drawString(72, height - 112, "Filtro: Solo Deudas Pagadas")
+        else:
+            p.drawString(72, height - 112, "Filtro: Todas las Deudas")
+        
+        # Tabla de deudas
+        data = [['ID', 'Fecha', 'Cliente', 'Cédula', 'Total (USD)', 'Saldo (USD)', 'Estado']]
+        
+        for deuda in deudas:
+            fecha_str = deuda['fecha'].strftime('%d/%m/%Y') if deuda['fecha'] else 'N/A'
+            data.append([
+                str(deuda['id']),
+                fecha_str,
+                deuda['cliente_nombre'][:20],  # Limitar longitud
+                deuda['cliente_cedula'],
+                f"${deuda['total']:.2f}",
+                f"${deuda['saldo_pendiente']:.2f}",
+                deuda['estado'].capitalize()
+            ])
+        
+        # Crear tabla
+        table = Table(data, colWidths=[40, 70, 90, 80, 70, 70, 70])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ]))
+        
+        table.wrapOn(p, width, height)
+        table.drawOn(p, 40, height - 180)
+        
+        # Pie de página
+        p.setFont("Helvetica", 8)
+        p.drawString(72, 30, f"Total de deudas registradas: {len(deudas)}")
+        total_pendiente = sum(d['saldo_pendiente'] for d in deudas)
+        p.drawString(72, 20, f"Total pendiente: ${total_pendiente:.2f}")
+        
+        p.save()
+        
+        buffer.seek(0)
+        
+        filtro_nombre = {
+            'todas': 'todas',
+            'pendientes': 'pendientes',
+            'pagadas': 'pagadas'
+        }.get(filtro, 'todas')
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"reporte_deudas_{filtro_nombre}_{datetime.now().strftime('%d%m%Y')}.pdf",
+            mimetype='application/pdf'
+        )
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        flash(f'Error al generar PDF: {str(e)}', 'danger')
+        return redirect(url_for('consultar_deudas'))
+
 
 # Ruta para la tienda (nueva página principal)
 @app.route('/tienda')
